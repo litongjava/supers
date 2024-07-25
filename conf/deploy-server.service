@@ -1,0 +1,14 @@
+[Unit]
+Description=deploy-server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Restart=on-failure
+RestartSec=5s
+WorkingDirectory = /opt/deploy-server
+ExecStart=/opt/deploy-server/deploy-server
+
+[Install]
+WantedBy=multi-user.target
