@@ -24,7 +24,7 @@ func RunWrapperCommand(command string) model.CommandResult {
     // 创建移动路径
     err := os.MkdirAll(movedDir, 0755)
     if err != nil {
-      result.Error = err.Error()
+      result.Error = err
       result.Success = false
       return result
 
@@ -35,14 +35,14 @@ func RunWrapperCommand(command string) model.CommandResult {
     //创建文件
     scriptFile, err := os.OpenFile(dstFilePath, os.O_CREATE|os.O_WRONLY, 0666)
     if err != nil {
-      result.Error = err.Error()
+      result.Error = err
       result.Success = false
       return result
     }
     defer scriptFile.Close()
     n, err := scriptFile.WriteString(command)
     if err != nil {
-      result.Error = err.Error()
+      result.Error = err
       result.Success = false
       return result
     } else {
