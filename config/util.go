@@ -10,7 +10,7 @@ import (
 var CONFIG *Config
 
 func init() {
-  yamlFile, err := ioutil.ReadFile("./config/config.yml")
+  yamlFile, err := ioutil.ReadFile("./conf/config.yml")
   //yamlFile, err := ioutil.ReadFile(filename)
   if err != nil {
     hlog.Error(err.Error())

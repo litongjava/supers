@@ -20,7 +20,7 @@ wget https://github.com/litongjava/deploy-server/releases/download/v0.1.0/deploy
 
 解压
 ```
-unzip deploy-server-linux-amd64.zip -d /opt
+unzip deploy-server-linux-amd64-1.0.0.zip -d /opt
 mv deploy-server-linux-amd64 deploy-server
 ```
 
