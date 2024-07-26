@@ -1,4 +1,4 @@
-package config
+package utils
 
 type Config struct {
   App *App `yaml:"app"`

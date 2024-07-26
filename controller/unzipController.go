@@ -1,7 +1,6 @@
 package controller
 
 import (
-  "deploy-server/config"
   "deploy-server/services"
   "deploy-server/utils"
   "encoding/json"
@@ -23,7 +22,7 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   }
   //验证密码
   var password = r.FormValue("p")
-  if password != config.CONFIG.App.Password {
+  if password != utils.CONFIG.App.Password {
     http.Error(w, "passowrd is not correct", http.StatusBadRequest)
     return
   }
@@ -88,7 +87,7 @@ func handleUploadUnzip(w http.ResponseWriter, r *http.Request) {
   }
   //验证密码
   var password = r.FormValue("p")
-  if password != config.CONFIG.App.Password {
+  if password != utils.CONFIG.App.Password {
     http.Error(w, "passowrd is not correct", http.StatusBadRequest)
     return
   }

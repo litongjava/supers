@@ -1,8 +1,8 @@
 package main
 
 import (
-  "deploy-server/config"
   "deploy-server/router"
+  "deploy-server/utils"
   "github.com/cloudwego/hertz/pkg/common/hlog"
   "io"
   "net/http"
@@ -21,7 +21,7 @@ func Init() {
   hlog.SetOutput(fileWriter)
 }
 func main() {
-  port := strconv.Itoa(config.CONFIG.App.Port)
+  port := strconv.Itoa(utils.CONFIG.App.Port)
   for i := 1; i < len(os.Args); i += 2 {
     param := os.Args[i]
     if param == "--port" {
