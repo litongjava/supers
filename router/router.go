@@ -13,5 +13,6 @@ import (
 //}
 
 func RegisterHadlder(h *server.Hertz) {
-  h.GET("/PingHandler", handler.PingHandler)
+  h.GET("/deploy/ping", handler.PingHandler)
+  h.POST("/deploy/exec", handler.ExecHandler)
 }

@@ -1,8 +1,8 @@
 package handler
 
 import (
+  "deploy-server/myutils"
   "deploy-server/services"
-  "deploy-server/utils"
   "encoding/json"
   "fmt"
   "github.com/cloudwego/hertz/pkg/common/hlog"
@@ -23,7 +23,7 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   }
   //验证密码
   var password = r.FormValue("p")
-  if password != utils.CONFIG.App.Password {
+  if password != myutils.CONFIG.App.Password {
     http.Error(w, "passowrd is not correct", http.StatusBadRequest)
     return
   }
@@ -57,7 +57,7 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   if movedDir == "" {
     hlog.Info("Not find m from request parameters")
   } else {
-    b, err := utils.MoveFile(file, movedDir, header.Filename)
+    b, err := myutils.MoveFile(file, movedDir, header.Filename)
     if b {
       http.Error(w, err.Error(), http.StatusBadRequest)
       return
@@ -68,7 +68,7 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
     hlog.Info("Not find d from request parameters")
   } else {
     length := r.ContentLength
-    b, err := utils.ExtractFile(file, targetDir, length)
+    b, err := myutils.ExtractFile(file, targetDir, length)
     if b {
       http.Error(w, err.Error(), http.StatusBadRequest)
       return
@@ -147,7 +147,7 @@ func handleUploadUnzip(w http.ResponseWriter, r *http.Request) {
   }
   //验证密码
   var password = r.FormValue("p")
-  if password != utils.CONFIG.App.Password {
+  if password != myutils.CONFIG.App.Password {
     http.Error(w, "passowrd is not correct", http.StatusBadRequest)
     return
   }
@@ -166,7 +166,7 @@ func handleUploadUnzip(w http.ResponseWriter, r *http.Request) {
   }
 
   length := r.ContentLength
-  b, err := utils.ExtractFile(file, targetDir, length)
+  b, err := myutils.ExtractFile(file, targetDir, length)
   if b {
     http.Error(w, err.Error(), http.StatusInternalServerError)
     return

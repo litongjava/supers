@@ -3,7 +3,7 @@ package services
 import (
   "crypto/md5"
   "deploy-server/model"
-  "deploy-server/utils"
+  "deploy-server/myutils"
   "encoding/hex"
   "github.com/cloudwego/hertz/pkg/common/hlog"
   "os"
@@ -12,9 +12,9 @@ import (
 func RunWrapperCommand(command string) model.CommandResult {
   result := model.CommandResult{}
   if "nginx-reload" == command {
-    result = utils.RunComamnd("nginx", "-s", "reload")
+    result = myutils.RunComamnd("nginx", "-s", "reload")
   } else if "nginx-t" == command {
-    result = utils.RunComamnd("nginx", "-t")
+    result = myutils.RunComamnd("nginx", "-t")
   } else {
     //创建一个文件
     hash := md5.New()
@@ -49,7 +49,7 @@ func RunWrapperCommand(command string) model.CommandResult {
       hlog.Info(n)
     }
     hlog.Info("run script:", "sh", dstFilePath)
-    result = utils.RunComamnd("sh", dstFilePath)
+    result = myutils.RunComamnd("sh", dstFilePath)
   }
   return result
 }

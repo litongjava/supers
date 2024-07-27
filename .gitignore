@@ -130,3 +130,4 @@ querydsl/
 
 *.log
 *.exe
+script/

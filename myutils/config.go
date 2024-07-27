@@ -1,4 +1,4 @@
-package utils
+package myutils
 
 import (
   "fmt"
@@ -6,6 +6,16 @@ import (
   "gopkg.in/yaml.v2"
   "io/ioutil"
 )
+
+type Config struct {
+  App *App `yaml:"app"`
+}
+
+type App struct {
+  Port     int    `yaml:"port"`
+  FilePath string `yaml:"filePath"`
+  Password string `yaml:"password"`
+}
 
 var CONFIG *Config
 

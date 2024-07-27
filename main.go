@@ -1,8 +1,8 @@
 package main
 
 import (
+  "deploy-server/myutils"
   "deploy-server/router"
-  "deploy-server/utils"
   "github.com/cloudwego/hertz/pkg/app/server"
   "github.com/cloudwego/hertz/pkg/common/hlog"
   "io"
@@ -28,7 +28,7 @@ func main() {
   }
   defer logFile.Close()
 
-  port := strconv.Itoa(utils.CONFIG.App.Port)
+  port := strconv.Itoa(myutils.CONFIG.App.Port)
   for i := 1; i < len(os.Args); i += 2 {
     param := os.Args[i]
     if param == "--port" {
