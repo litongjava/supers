@@ -1,4 +1,4 @@
-package controller
+package handler
 
 import (
   "deploy-server/services"
@@ -7,6 +7,7 @@ import (
   "fmt"
   "github.com/cloudwego/hertz/pkg/common/hlog"
   "net/http"
+  "os"
 )
 
 func RegisterUnzipRouter() {
@@ -38,6 +39,16 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   // 获取解压路径
   targetDir := r.FormValue("d")
   // 获取命令
+  workDir := r.FormValue("w")
+
+  // 检查目录是否存在
+  if _, err := os.Stat(workDir); os.IsNotExist(err) {
+    // 如果目录不存在，则创建目录
+    err := os.MkdirAll(workDir, os.ModePerm)
+    if err != nil {
+      fmt.Println("Failed to create dir:", err)
+    }
+  }
   cmd1 := r.FormValue("c1")
   cmd2 := r.FormValue("c2")
   cmd3 := r.FormValue("c3")
@@ -70,8 +81,9 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
     hlog.Info("cmd1:", cmd1)
     result := services.RunWrapperCommand(cmd1)
     if result.Error != nil {
-      hlog.Info("err", err.Error())
-      http.Error(w, result.Error.Error(), http.StatusInternalServerError)
+      message := "cmd2 err:" + err.Error()
+      hlog.Info(message)
+      http.Error(w, message, http.StatusInternalServerError)
       return
     }
   }
@@ -82,8 +94,9 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
     hlog.Info("cmd2:", cmd2)
     result := services.RunWrapperCommand(cmd2)
     if result.Error != nil {
-      hlog.Info("err", err.Error())
-      http.Error(w, result.Error.Error(), http.StatusInternalServerError)
+      message := "cmd2 err:" + result.Error.Error()
+      hlog.Info(message)
+      http.Error(w, message, http.StatusInternalServerError)
       return
     }
   }
@@ -94,8 +107,9 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
     hlog.Info("cmd3:", cmd3)
     result := services.RunWrapperCommand(cmd3)
     if result.Error != nil {
-      hlog.Info("err", err.Error())
-      http.Error(w, result.Error.Error(), http.StatusInternalServerError)
+      message := "cmd3 err" + result.Error.Error()
+      hlog.Info(message)
+      http.Error(w, message, http.StatusInternalServerError)
       return
     }
   }
@@ -105,10 +119,17 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   } else {
     hlog.Info("cmd:", cmd)
     result := services.RunWrapperCommand(cmd)
+    if result.Error != nil {
+      message := "cmd err" + result.Error.Error()
+      hlog.Info(message)
+      http.Error(w, message, http.StatusInternalServerError)
+      return
+    }
     jsonBytes, err := json.Marshal(result)
     if err != nil {
-      hlog.Info("err", err.Error())
-      http.Error(w, err.Error(), http.StatusInternalServerError)
+      message := "json marshal err" + err.Error()
+      hlog.Info(message)
+      http.Error(w, message, http.StatusInternalServerError)
       return
     }
     _, err = fmt.Fprintln(w, string(jsonBytes))
@@ -116,7 +137,6 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
       return
     }
   }
-
 }
 
 // 上传文件并解压

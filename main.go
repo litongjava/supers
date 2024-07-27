@@ -3,24 +3,31 @@ package main
 import (
   "deploy-server/router"
   "deploy-server/utils"
+  "github.com/cloudwego/hertz/pkg/app/server"
   "github.com/cloudwego/hertz/pkg/common/hlog"
   "io"
-  "net/http"
   "os"
   "strconv"
 )
 
-func Init() {
+func InitLog() (*os.File, error) {
   hlog.SetLevel(hlog.LevelDebug)
   f, err := os.Create("app.log")
   if err != nil {
-    panic(err)
+    return nil, err
   }
-  defer f.Close()
   fileWriter := io.MultiWriter(f, os.Stdout)
   hlog.SetOutput(fileWriter)
+  return f, nil
 }
+
 func main() {
+  logFile, err := InitLog()
+  if err != nil {
+    panic(err)
+  }
+  defer logFile.Close()
+
   port := strconv.Itoa(utils.CONFIG.App.Port)
   for i := 1; i < len(os.Args); i += 2 {
     param := os.Args[i]
@@ -29,9 +36,8 @@ func main() {
     }
   }
   hlog.Info("start listen on:", port)
-  router.RegisterRoutes()
-  err := http.ListenAndServe(":"+port, nil)
-  if err != nil {
-    hlog.Error(err.Error())
-  }
+  ports := server.WithHostPorts("0.0.0.0:" + port)
+  h := server.Default(ports)
+  router.RegisterHadlder(h)
+  h.Spin()
 }
