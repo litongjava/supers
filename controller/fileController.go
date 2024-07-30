@@ -1,7 +1,7 @@
-package handler
+package controller
 
 import (
-  "deploy-server/myutils"
+  "deploy-server/utils"
   "fmt"
   "github.com/cloudwego/hertz/pkg/common/hlog"
   "github.com/google/uuid"
@@ -22,7 +22,7 @@ func RegisterFileRouter() {
 func handleUpload(writer http.ResponseWriter, request *http.Request) {
   //验证密码
   var password = request.FormValue("p")
-  if password != myutils.CONFIG.App.Password {
+  if password != utils.CONFIG.App.Password {
     http.Error(writer, "passowrd is not correct", http.StatusBadRequest)
     return
   }
@@ -36,7 +36,7 @@ func handleUpload(writer http.ResponseWriter, request *http.Request) {
   dateString := timeNow.Format("2006-01-02")
   uuidString := uuid.New().String()
 
-  savePath := myutils.CONFIG.App.FilePath + "/" + dateString + "/" + uuidString
+  savePath := utils.CONFIG.App.FilePath + "/" + dateString + "/" + uuidString
   isExists := IsExist(savePath)
   if !isExists {
     hlog.Info("create path", savePath)
@@ -63,7 +63,7 @@ func handleUpload(writer http.ResponseWriter, request *http.Request) {
 func handleDownload(writer http.ResponseWriter, request *http.Request) {
   //验证密码
   var password = request.FormValue("p")
-  if password != myutils.CONFIG.App.Password {
+  if password != utils.CONFIG.App.Password {
     http.Error(writer, "passowrd is not correct", http.StatusBadRequest)
     return
   }
@@ -74,7 +74,7 @@ func handleDownload(writer http.ResponseWriter, request *http.Request) {
   }
 
   hlog.Info("subDir:", subDir)
-  savePath := myutils.CONFIG.App.FilePath + "/" + subDir
+  savePath := utils.CONFIG.App.FilePath + "/" + subDir
   filename, done := getFilename(writer, savePath)
   if done {
     return

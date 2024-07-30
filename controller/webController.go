@@ -1,8 +1,8 @@
-package handler
+package controller
 
 import (
-  "deploy-server/myutils"
   "deploy-server/services"
+  "deploy-server/utils"
   "encoding/base64"
   "encoding/json"
   "fmt"
@@ -11,11 +11,15 @@ import (
   "regexp"
 )
 
+func RegisterWebRouter() {
+  http.HandleFunc("/deploy/web/", handleWeb)
+}
+
 func handleWeb(writer http.ResponseWriter, request *http.Request) {
   //log.Println(request.URL.Path)
   //验证密码
   var password = request.FormValue("p")
-  if password != myutils.CONFIG.App.Password {
+  if password != utils.CONFIG.App.Password {
     http.Error(writer, "passowrd is not correct", http.StatusBadRequest)
     return
   }

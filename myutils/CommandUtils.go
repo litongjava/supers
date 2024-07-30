@@ -23,7 +23,7 @@ func RunComamnd(name string, arg ...string) model.CommandResult {
   cmdResult := model.CommandResult{}
   cmdResult.Time = end - start
   if err != nil {
-    cmdResult.Error = err
+    cmdResult.Err = err
     cmdResult.Success = false
   } else {
     cmdResult.Success = true

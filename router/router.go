@@ -1,18 +1,10 @@
 package router
 
-import (
-  "deploy-server/handler"
-  "github.com/cloudwego/hertz/pkg/app/server"
-)
+import "deploy-server/controller"
 
-//func RegisterRoutes() {
-//  handler.RegisterWebRouter()
-//  handler.RegisterFileRouter()
-//  handler.RegisterUnzipRouter()
-//  handler.RegisterStatusRouter()
-//}
-
-func RegisterHadlder(h *server.Hertz) {
-  h.GET("/deploy/ping", handler.PingHandler)
-  h.POST("/deploy/exec", handler.ExecHandler)
+func RegisterRoutes() {
+  controller.RegisterWebRouter()
+  controller.RegisterFileRouter()
+  controller.RegisterUnzipRouter()
+  controller.RegisterStatusRouter()
 }

@@ -1,11 +1,11 @@
 package main
 
 import (
-  "deploy-server/myutils"
   "deploy-server/router"
-  "github.com/cloudwego/hertz/pkg/app/server"
+  "deploy-server/utils"
   "github.com/cloudwego/hertz/pkg/common/hlog"
   "io"
+  "net/http"
   "os"
   "strconv"
 )
@@ -28,7 +28,7 @@ func main() {
   }
   defer logFile.Close()
 
-  port := strconv.Itoa(myutils.CONFIG.App.Port)
+  port := strconv.Itoa(utils.CONFIG.App.Port)
   for i := 1; i < len(os.Args); i += 2 {
     param := os.Args[i]
     if param == "--port" {
@@ -36,8 +36,9 @@ func main() {
     }
   }
   hlog.Info("start listen on:", port)
-  ports := server.WithHostPorts("0.0.0.0:" + port)
-  h := server.Default(ports)
-  router.RegisterHadlder(h)
-  h.Spin()
+  router.RegisterRoutes()
+  err = http.ListenAndServe(":"+port, nil)
+  if err != nil {
+    hlog.Error(err.Error())
+  }
 }
