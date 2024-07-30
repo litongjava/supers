@@ -7,46 +7,44 @@ import (
   "encoding/hex"
   "github.com/cloudwego/hertz/pkg/common/hlog"
   "os"
+  "path/filepath"
 )
 
-func RunWrapperCommand(command string) (model.CommandResult, error) {
-  result := model.CommandResult{}
+func RunWrapperCommand(workDir string, command string) (model.CommandResult, error) {
   if "nginx-reload" == command {
-    result = utils.RunComamnd("nginx", "-s", "reload")
+    return utils.RunComamnd(workDir, "nginx", "-s", "reload")
   } else if "nginx-t" == command {
-    result = utils.RunComamnd("nginx", "-t")
+    return utils.RunComamnd(workDir, "nginx", "-t")
   } else {
     //创建一个文件
     hash := md5.New()
     hash.Write([]byte(command))
     md5String := hex.EncodeToString(hash.Sum(nil))
-    movedDir := "script"
+    movedDir := filepath.Join(workDir, "script")
     // 创建移动路径
     err := os.MkdirAll(movedDir, 0755)
     if err != nil {
+      result := model.CommandResult{}
       result.Success = false
       return result, err
-
     }
     //移动到这个文件夹
-    dstFilePath := movedDir + "/" + md5String
+    dstFilePath := filepath.Join(movedDir, md5String)
     hlog.Info("dstFilePath:", dstFilePath)
     //创建文件
     scriptFile, err := os.OpenFile(dstFilePath, os.O_CREATE|os.O_WRONLY, 0666)
     if err != nil {
+      result := model.CommandResult{}
       result.Success = false
       return result, err
     }
     defer scriptFile.Close()
-    n, err := scriptFile.WriteString(command)
+    _, err = scriptFile.WriteString(command)
     if err != nil {
+      result := model.CommandResult{}
       result.Success = false
       return result, err
-    } else {
-      hlog.Info(n)
     }
-    hlog.Info("run script:", "sh", dstFilePath)
-    result = utils.RunComamnd("sh", dstFilePath)
+    return utils.RunComamnd(workDir, "sh", dstFilePath)
   }
-  return result, nil
 }

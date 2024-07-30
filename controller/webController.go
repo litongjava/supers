@@ -27,7 +27,14 @@ func handleWeb(writer http.ResponseWriter, request *http.Request) {
   matches := pattern.FindStringSubmatch(request.URL.Path)
   if len(matches) > 0 {
     bytes, _ := base64.StdEncoding.DecodeString(matches[1])
-    result := services.RunWrapperCommand(string(bytes))
+    result, err := services.RunWrapperCommand("", string(bytes))
+    if err != nil {
+      log.Println("err", err.Error())
+      _, err = fmt.Fprintln(writer, err.Error())
+      if err != nil {
+        return
+      }
+    }
     //encoder := jsonString.NewEncoder(writer)
     //err := encoder.Encode(result)
     //对返回内容使用base64加密

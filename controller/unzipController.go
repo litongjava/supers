@@ -8,6 +8,7 @@ import (
   "github.com/cloudwego/hertz/pkg/common/hlog"
   "net/http"
   "os"
+  "time"
 )
 
 func RegisterUnzipRouter() {
@@ -17,6 +18,7 @@ func RegisterUnzipRouter() {
 
 // 上传文件,放到指定目录,并运行脚本
 func handleUploadRun(w http.ResponseWriter, r *http.Request) {
+  startTime := time.Now().Unix()
   if r.Method != "POST" {
     http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
     return
@@ -45,12 +47,14 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   cmd2 := r.FormValue("c2")
   cmd3 := r.FormValue("c3")
   cmd := r.FormValue("c")
-  _, err = os.Stat(workDir)
-  if os.IsNotExist(err) {
-    err := os.MkdirAll(workDir, os.ModePerm)
-    if err != nil {
-      http.Error(w, err.Error(), http.StatusBadRequest)
-      return
+  if workDir != "" {
+    _, err = os.Stat(workDir)
+    if os.IsNotExist(err) {
+      err := os.MkdirAll(workDir, os.ModePerm)
+      if err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+      }
     }
   }
 
@@ -79,9 +83,9 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
     hlog.Info("Not find c1 from request parameters")
   } else {
     hlog.Info("cmd1:", cmd1)
-    _, err := services.RunWrapperCommand(cmd1)
+    result, err := services.RunWrapperCommand(workDir, cmd1)
     if err != nil {
-      message := "cmd2 err:" + err.Error()
+      message := "cmd1 " + cmd1 + " output:" + result.Output + " err:" + err.Error()
       hlog.Info(message)
       http.Error(w, message, http.StatusInternalServerError)
       return
@@ -92,9 +96,9 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
     hlog.Info("Not find c1 from request parameters")
   } else {
     hlog.Info("cmd2:", cmd2)
-    _, err := services.RunWrapperCommand(cmd2)
+    result, err := services.RunWrapperCommand(workDir, cmd2)
     if err != nil {
-      message := "cmd2 err:" + err.Error()
+      message := "cmd2 " + cmd2 + " output:" + result.Output + " err:" + err.Error()
       hlog.Info(message)
       http.Error(w, message, http.StatusInternalServerError)
       return
@@ -105,9 +109,9 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
     hlog.Info("Not find c1 from request parameters")
   } else {
     hlog.Info("cmd3:", cmd3)
-    _, err := services.RunWrapperCommand(cmd3)
+    result, err := services.RunWrapperCommand(workDir, cmd3)
     if err != nil {
-      message := "cmd3 err" + err.Error()
+      message := "cmd3 " + cmd3 + " output:" + result.Output + " err:" + err.Error()
       hlog.Info(message)
       http.Error(w, message, http.StatusInternalServerError)
       return
@@ -118,13 +122,15 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
     hlog.Info("Not find c from request parameters")
   } else {
     hlog.Info("cmd:", cmd)
-    result, err := services.RunWrapperCommand(cmd)
+    result, err := services.RunWrapperCommand(workDir, cmd)
     if err != nil {
-      message := "cmd err" + err.Error()
+      message := "cmd " + cmd + " output:" + result.Output + " err:" + err.Error()
       hlog.Info(message)
       http.Error(w, message, http.StatusInternalServerError)
       return
     }
+    endTime := time.Now().Unix()
+    result.Time = endTime - startTime
     jsonBytes, err := json.Marshal(result)
     if err != nil {
       message := "json marshal err" + err.Error()
