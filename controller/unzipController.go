@@ -46,6 +46,12 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   cmd1 := r.FormValue("c1")
   cmd2 := r.FormValue("c2")
   cmd3 := r.FormValue("c3")
+  cmd4 := r.FormValue("c4")
+  cmd5 := r.FormValue("c5")
+  cmd6 := r.FormValue("c6")
+  cmd7 := r.FormValue("c7")
+  cmd8 := r.FormValue("c8")
+  cmd9 := r.FormValue("c9")
   cmd := r.FormValue("c")
   if workDir != "" {
     _, err = os.Stat(workDir)
@@ -112,6 +118,83 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
     result, err := services.RunWrapperCommand(workDir, cmd3)
     if err != nil {
       message := "cmd3 " + cmd3 + " output:" + result.Output + " err:" + err.Error()
+      hlog.Info(message)
+      http.Error(w, message, http.StatusInternalServerError)
+      return
+    }
+  }
+
+  if cmd4 == "" {
+    hlog.Info("Not find c1 from request parameters")
+  } else {
+    hlog.Info("cmd4:", cmd4)
+    result, err := services.RunWrapperCommand(workDir, cmd4)
+    if err != nil {
+      message := "cmd4 " + cmd4 + " output:" + result.Output + " err:" + err.Error()
+      hlog.Info(message)
+      http.Error(w, message, http.StatusInternalServerError)
+      return
+    }
+  }
+
+  if cmd5 == "" {
+    hlog.Info("Not find c1 from request parameters")
+  } else {
+    hlog.Info("cmd5:", cmd5)
+    result, err := services.RunWrapperCommand(workDir, cmd5)
+    if err != nil {
+      message := "cmd5 " + cmd5 + " output:" + result.Output + " err:" + err.Error()
+      hlog.Info(message)
+      http.Error(w, message, http.StatusInternalServerError)
+      return
+    }
+  }
+
+  if cmd6 == "" {
+    hlog.Info("Not find c1 from request parameters")
+  } else {
+    hlog.Info("cmd6:", cmd6)
+    result, err := services.RunWrapperCommand(workDir, cmd6)
+    if err != nil {
+      message := "cmd6 " + cmd6 + " output:" + result.Output + " err:" + err.Error()
+      hlog.Info(message)
+      http.Error(w, message, http.StatusInternalServerError)
+      return
+    }
+  }
+
+  if cmd7 == "" {
+    hlog.Info("Not find c1 from request parameters")
+  } else {
+    hlog.Info("cmd7:", cmd7)
+    result, err := services.RunWrapperCommand(workDir, cmd7)
+    if err != nil {
+      message := "cmd7 " + cmd7 + " output:" + result.Output + " err:" + err.Error()
+      hlog.Info(message)
+      http.Error(w, message, http.StatusInternalServerError)
+      return
+    }
+  }
+  if cmd8 == "" {
+    hlog.Info("Not find c1 from request parameters")
+  } else {
+    hlog.Info("cmd8:", cmd8)
+    result, err := services.RunWrapperCommand(workDir, cmd8)
+    if err != nil {
+      message := "cmd8 " + cmd8 + " output:" + result.Output + " err:" + err.Error()
+      hlog.Info(message)
+      http.Error(w, message, http.StatusInternalServerError)
+      return
+    }
+  }
+
+  if cmd9 == "" {
+    hlog.Info("Not find c1 from request parameters")
+  } else {
+    hlog.Info("cmd9:", cmd9)
+    result, err := services.RunWrapperCommand(workDir, cmd9)
+    if err != nil {
+      message := "cmd9 " + cmd9 + " output:" + result.Output + " err:" + err.Error()
       hlog.Info(message)
       http.Error(w, message, http.StatusInternalServerError)
       return

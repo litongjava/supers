@@ -15,12 +15,12 @@ deploy-server是一款使用go语言开发用于自动部署的服务
 ```
 mkdir -p /data/package/
 cd /data/package/
-wget https://github.com/litongjava/deploy-server/releases/download/v0.1.0/deploy-server-linux-amd64.zip
+wget https://github.com/litongjava/deploy-server/releases/
 ```
 
 解压
 ```
-unzip deploy-server-linux-amd64-1.0.0.zip -d /opt
+unzip deploy-server-1.0.0-linux-amd64 -d /opt
 mv deploy-server-linux-amd64 deploy-server
 ```
 
