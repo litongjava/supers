@@ -99,7 +99,7 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   }
 
   if cmd2 == "" {
-    hlog.Info("Not find c1 from request parameters")
+    hlog.Info("Not find c2 from request parameters")
   } else {
     hlog.Info("cmd2:", cmd2)
     result, err := services.RunWrapperCommand(workDir, cmd2)
@@ -112,7 +112,7 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   }
 
   if cmd3 == "" {
-    hlog.Info("Not find c1 from request parameters")
+    hlog.Info("Not find c3 from request parameters")
   } else {
     hlog.Info("cmd3:", cmd3)
     result, err := services.RunWrapperCommand(workDir, cmd3)
@@ -125,7 +125,7 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   }
 
   if cmd4 == "" {
-    hlog.Info("Not find c1 from request parameters")
+    hlog.Info("Not find c4 from request parameters")
   } else {
     hlog.Info("cmd4:", cmd4)
     result, err := services.RunWrapperCommand(workDir, cmd4)
@@ -138,7 +138,7 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   }
 
   if cmd5 == "" {
-    hlog.Info("Not find c1 from request parameters")
+    hlog.Info("Not find c5 from request parameters")
   } else {
     hlog.Info("cmd5:", cmd5)
     result, err := services.RunWrapperCommand(workDir, cmd5)
@@ -151,7 +151,7 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   }
 
   if cmd6 == "" {
-    hlog.Info("Not find c1 from request parameters")
+    hlog.Info("Not find c6 from request parameters")
   } else {
     hlog.Info("cmd6:", cmd6)
     result, err := services.RunWrapperCommand(workDir, cmd6)
@@ -164,7 +164,7 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   }
 
   if cmd7 == "" {
-    hlog.Info("Not find c1 from request parameters")
+    hlog.Info("Not find c7 from request parameters")
   } else {
     hlog.Info("cmd7:", cmd7)
     result, err := services.RunWrapperCommand(workDir, cmd7)
@@ -176,7 +176,7 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
     }
   }
   if cmd8 == "" {
-    hlog.Info("Not find c1 from request parameters")
+    hlog.Info("Not find c8 from request parameters")
   } else {
     hlog.Info("cmd8:", cmd8)
     result, err := services.RunWrapperCommand(workDir, cmd8)
@@ -189,7 +189,7 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   }
 
   if cmd9 == "" {
-    hlog.Info("Not find c1 from request parameters")
+    hlog.Info("Not find c9 from request parameters")
   } else {
     hlog.Info("cmd9:", cmd9)
     result, err := services.RunWrapperCommand(workDir, cmd9)
