@@ -26,7 +26,8 @@ func handleUploadRun(w http.ResponseWriter, r *http.Request) {
   //验证密码
   var password = r.FormValue("p")
   if password != utils.CONFIG.App.Password {
-    http.Error(w, "passowrd is not correct", http.StatusBadRequest)
+    hlog.Info("the correct password is :", utils.CONFIG.App.Password)
+    http.Error(w, "passowrd is not correct", http.StatusUnauthorized)
     return
   }
   file, header, err := r.FormFile("file")

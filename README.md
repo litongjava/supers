@@ -128,9 +128,9 @@ loader.path=file:./lib
 
 修改pom.xml的properties添加assembly,spring-boot.version和main.class
 ```
-    <spring-boot.version>2.5.6</spring-boot.version>
-    <assembly>full</assembly>
-    <!-- <assembly>full</assembly> -->
+<spring-boot.version>2.5.6</spring-boot.version>
+<assembly>full</assembly>
+<!-- <assembly>full</assembly> -->
 <main.class>com.xxx.ServiceTestApplication</main.class>
 
 ```

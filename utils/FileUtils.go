@@ -53,7 +53,11 @@ func MoveFile(file multipart.File, movedDir string, dstFilename string) (bool, e
 
 func ExtractFile(file multipart.File, targetDir string, length int64) (bool, error) {
   // 创建解压路径
-  err := os.MkdirAll(targetDir, 0755)
+  err := os.Remove(targetDir)
+  if err != nil {
+    return true, err
+  }
+  err = os.MkdirAll(targetDir, 0755)
   if err != nil {
     return true, err
   }
