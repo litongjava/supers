@@ -51,9 +51,28 @@ func MoveFile(file multipart.File, movedDir string, dstFilename string) (bool, e
   return false, nil
 }
 
+// 检查文件或目录是否存在
+func fileExists(path string) bool {
+  _, err := os.Stat(path)
+  if os.IsNotExist(err) {
+    return false
+  }
+  return err == nil
+}
+
+// 如果文件存在则删除
+func removeFileIfExists(path string) error {
+  if fileExists(path) {
+    err := os.RemoveAll(path)
+    if err != nil {
+      return err
+    }
+  }
+  return nil
+}
 func ExtractFile(file multipart.File, targetDir string, length int64) (bool, error) {
   // 创建解压路径
-  err := os.Remove(targetDir)
+  err := removeFileIfExists(targetDir)
   if err != nil {
     return true, err
   }
