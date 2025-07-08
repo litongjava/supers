@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
@@ -43,7 +44,7 @@ func LoadConfigs(dir string) (map[string]ServiceConfig, error) {
 
 		for _, l := range lines {
 			l = strings.TrimSpace(l)
-			if strings.HasPrefix(l, "ExecStart=") {
+			if strings.HasPrefix(l, "=") {
 				execStart = strings.TrimPrefix(l, "ExecStart=")
 			} else if strings.HasPrefix(l, "Restart=") {
 				if strings.Contains(l, "on-failure") {
@@ -114,6 +115,7 @@ func LoadConfigFile(dir, name string) (ServiceConfig, error) {
 		Delay:         restartDelay,
 		RestartOnZero: false,
 	}
+	hlog.Info(name, " ", parts)
 
 	return ServiceConfig{
 		Name:          name,
