@@ -38,7 +38,7 @@ func SetWorkingDir(name, dir string) {
 }
 
 // Manage starts and monitors a named process with policy.
-func Manage(name string, args []string, WorkingDirectory string, policy RestartPolicy) {
+func Manage(name string, cmd []string, WorkingDirectory string, policy RestartPolicy) {
 	go func() {
 		retries := 0
 		for {
@@ -50,10 +50,10 @@ func Manage(name string, args []string, WorkingDirectory string, policy RestartP
 
 			// —— 自动识别可执行程序 ——
 			program := name
-			cmdArgs := args
-			if len(args) > 0 && (strings.HasPrefix(args[0], "/") || strings.Contains(args[0], "/")) {
-				program = args[0]
-				cmdArgs = args[1:]
+			cmdArgs := cmd
+			if len(cmd) > 0 && (strings.HasPrefix(cmd[0], "/") || strings.Contains(cmd[0], "/")) {
+				program = cmd[0]
+				cmdArgs = cmd[1:]
 			}
 
 			// 记录启动时间和命令行
@@ -64,7 +64,7 @@ func Manage(name string, args []string, WorkingDirectory string, policy RestartP
 			}
 			commands[name] = fullCmd
 
-			hlog.Infof("Starting %s %v", name, args)
+			hlog.Infof("Starting %s %v", name, cmd)
 			cmd := exec.Command(program, cmdArgs...)
 			if WorkingDirectory != "" {
 				cmd.Dir = WorkingDirectory
@@ -171,6 +171,19 @@ func Uptime(name string) string {
 // Command returns a truncated command summary, e.g. "java -jar target/ai…"
 func Command(name string) string {
 	cmd, ok := commands[name]
+	if !ok {
+		return ""
+	}
+	const maxLen = 20
+	if len(cmd) <= maxLen {
+		return cmd
+	}
+	return cmd[:maxLen] + "…"
+}
+
+// Command returns a truncated workingDir summary
+func WorkingDir(name string) string {
+	cmd, ok := workingDirs[name]
 	if !ok {
 		return ""
 	}

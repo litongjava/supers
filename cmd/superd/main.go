@@ -87,7 +87,8 @@ func handleConn(conn net.Conn) {
 			status := process.Status(svc)
 			uptime := process.Uptime(svc)
 			cmdSummary := process.Command(svc)
-			line := fmt.Sprintf("%s %s %s %s\n", svc, status, uptime, cmdSummary)
+			workingDirSummary := process.WorkingDir(svc)
+			line := fmt.Sprintf("%s %s %s %s %s\n", svc, status, uptime, workingDirSummary, cmdSummary)
 			conn.Write([]byte(line))
 		}
 	case "status":
@@ -100,7 +101,8 @@ func handleConn(conn net.Conn) {
 		status := process.Status(name)
 		uptime := process.Uptime(name)
 		cmdSummary := process.Command(name)
-		line := fmt.Sprintf("%s %s %s %s\n", name, status, uptime, cmdSummary)
+		workingDirSummary := process.WorkingDir(name)
+		line := fmt.Sprintf("%s %s %s %s %s\n", name, status, uptime, workingDirSummary, cmdSummary)
 		conn.Write([]byte(line))
 
 	case "stop":
