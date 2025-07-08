@@ -74,16 +74,19 @@ func ExtractFile(file multipart.File, targetDir string, length int64) (bool, err
   // 创建解压路径
   err := removeFileIfExists(targetDir)
   if err != nil {
+    hlog.Error("err:", err)
     return true, err
   }
   err = os.MkdirAll(targetDir, 0755)
   if err != nil {
+    hlog.Error("err:", err)
     return true, err
   }
 
   // 解压文件
   reader, err := zip.NewReader(file, length)
   if err != nil {
+    hlog.Error("err:", err)
     return true, err
   }
 
@@ -96,6 +99,7 @@ func ExtractFile(file multipart.File, targetDir string, length int64) (bool, err
     if f.FileInfo().IsDir() {
       err = os.MkdirAll(path, f.Mode())
       if err != nil {
+        hlog.Error("err:", err)
         return true, err
       }
       continue
@@ -103,23 +107,27 @@ func ExtractFile(file multipart.File, targetDir string, length int64) (bool, err
 
     err = os.MkdirAll(filepath.Dir(path), 0755)
     if err != nil {
+      hlog.Error("err:", err)
       return true, err
     }
 
     unzippedFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
     if err != nil {
+      hlog.Error("err:", err)
       return true, err
     }
     defer unzippedFile.Close()
 
     zippedFile, err := f.Open()
     if err != nil {
+      hlog.Error("err:", err)
       return true, err
     }
     defer zippedFile.Close()
 
     _, err = io.Copy(unzippedFile, zippedFile)
     if err != nil {
+      hlog.Error("err:", err)
       return true, err
     }
   }

@@ -1,10 +1,10 @@
 package router
 
-import "deploy-server/controller"
+import "github.com/litongjava/supers/controller"
 
 func RegisterRoutes() {
-  controller.RegisterWebRouter()
-  controller.RegisterFileRouter()
-  controller.RegisterUnzipRouter()
-  controller.RegisterStatusRouter()
+	controller.RegisterWebRouter()
+	controller.RegisterFileRouter()
+	controller.RegisterUnzipRouter()
+	controller.RegisterStatusRouter()
 }

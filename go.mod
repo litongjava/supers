@@ -1,4 +1,4 @@
-module deploy-server
+module github.com/litongjava/supers
 
 go 1.16
 
