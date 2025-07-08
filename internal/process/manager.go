@@ -85,12 +85,16 @@ func Stop(name string) error {
 	if err := cmd.Process.Kill(); err != nil {
 		return err
 	}
+	// 标记一下，下次 Status 就能识别
 	manualStop[name] = true
 	return nil
 }
 
 // Status returns "running" or "exited" or "not found".
 func Status(name string) string {
+	if manualStop[name] {
+		return "stopped"
+	}
 	cmd, ok := procs[name]
 	if !ok {
 		return "not found"
