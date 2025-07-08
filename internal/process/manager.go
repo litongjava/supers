@@ -21,6 +21,7 @@ var (
 	// procs holds active commands by name
 	procs = make(map[string]*exec.Cmd)
 )
+var manualStop = make(map[string]bool)
 
 // Manage starts and monitors a named process with policy.
 func Manage(name string, args []string, policy RestartPolicy) {
@@ -49,6 +50,10 @@ func Manage(name string, args []string, policy RestartPolicy) {
 			hlog.Infof("%s PID=%d", name, pid)
 
 			err = cmd.Wait()
+			if manualStop[name] {
+				hlog.Infof("Process %s was manually stopped; skipping restart", name)
+				return
+			}
 			exitCode := cmd.ProcessState.ExitCode()
 			msg := strings.Join([]string{name, "exited", "code", string(exitCode)}, " ")
 			if err != nil {
@@ -77,7 +82,11 @@ func Stop(name string) error {
 	if !ok || cmd.Process == nil {
 		return fmt.Errorf("no process: %s", name)
 	}
-	return cmd.Process.Kill()
+	if err := cmd.Process.Kill(); err != nil {
+		return err
+	}
+	manualStop[name] = true
+	return nil
 }
 
 // Status returns "running" or "exited" or "not found".
