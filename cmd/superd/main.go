@@ -1,14 +1,16 @@
 package main
 
 import (
-	"github.com/cloudwego/hertz/pkg/common/hlog"
-	"github.com/litongjava/supers/internal/process"
-	"github.com/litongjava/supers/router"
-	"github.com/litongjava/supers/utils"
 	"io"
 	"net/http"
 	"os"
 	"strconv"
+	"time"
+
+	"github.com/cloudwego/hertz/pkg/common/hlog"
+	"github.com/litongjava/supers/internal/process"
+	"github.com/litongjava/supers/router"
+	"github.com/litongjava/supers/utils"
 )
 
 func InitLog() (*os.File, error) {
@@ -29,14 +31,18 @@ func main() {
 	}
 	defer logFile.Close()
 
-	// 1. 加载配置
+	// Load configuration
 	port := strconv.Itoa(utils.CONFIG.App.Port)
-	// 2. 启动演示进程：sleep
-	if err := process.Start("sleep", "60"); err != nil {
-		hlog.Errorf("Failed to start demo process: %v", err)
-	}
 
-	// 3. 启动 HTTP 服务
+	// Start and monitor demo process with restart policy
+	policy := process.RestartPolicy{
+		MaxRetries:    -1,
+		Delay:         5 * time.Second,
+		RestartOnZero: false,
+	}
+	process.Manage("sleep", []string{"60"}, policy)
+
+	// Start HTTP server
 	for i := 1; i < len(os.Args); i += 2 {
 		if os.Args[i] == "--port" {
 			port = os.Args[i+1]
@@ -44,8 +50,7 @@ func main() {
 	}
 	hlog.Infof("start listen on: %s", port)
 	router.RegisterRoutes()
-	err = http.ListenAndServe(":"+port, nil)
-	if err != nil {
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		hlog.Error(err.Error())
 	}
 }
