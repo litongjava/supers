@@ -2,6 +2,7 @@ package process
 
 import (
 	"fmt"
+	"github.com/litongjava/supers/internal/events"
 	"github.com/litongjava/supers/internal/logger"
 	"os/exec"
 	"strings"
@@ -50,16 +51,27 @@ func Manage(name string, args []string, policy RestartPolicy) {
 			hlog.Infof("%s PID=%d", name, pid)
 
 			err = cmd.Wait()
-			if manualStop[name] {
-				hlog.Infof("Process %s was manually stopped; skipping restart", name)
-				return
-			}
 			exitCode := cmd.ProcessState.ExitCode()
+			e := events.Event{Name: name, ExitCode: exitCode, Type: events.EventProcessExited}
+			events.Emit(e)
+
 			msg := strings.Join([]string{name, "exited", "code", string(exitCode)}, " ")
 			if err != nil {
 				hlog.Errorf(msg)
 			} else {
 				hlog.Infof(msg)
+			}
+
+			if shouldRestart(exitCode, retries, policy) {
+				re := events.Event{Name: name, ExitCode: exitCode, Type: events.EventProcessRestarted}
+				events.Emit(re)
+				retries++
+				time.Sleep(policy.Delay)
+				continue
+			}
+			if manualStop[name] {
+				hlog.Infof("Process %s was manually stopped; skipping restart", name)
+				return
 			}
 
 			// decide restart
@@ -112,4 +124,14 @@ func List() map[string]string {
 		statuses[name] = Status(name)
 	}
 	return statuses
+}
+
+func shouldRestart(exitCode, retries int, policy RestartPolicy) bool {
+	if exitCode == 0 && !policy.RestartOnZero {
+		return false
+	}
+	if policy.MaxRetries >= 0 && retries >= policy.MaxRetries {
+		return false
+	}
+	return true
 }
