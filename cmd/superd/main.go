@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/litongjava/supers/router"
 	"io"
 	"net"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/litongjava/supers/internal/process"
+	"github.com/litongjava/supers/router"
 	"github.com/litongjava/supers/utils"
 )
 
@@ -33,28 +33,36 @@ func handleConn(conn net.Conn) {
 	if len(fields) == 0 {
 		return
 	}
-	switch fields[0] {
+	cmd := fields[0]
+	name := ""
+	if len(fields) > 1 {
+		name = fields[1]
+	}
+	switch cmd {
 	case "list":
-		for name, st := range process.List() {
-			conn.Write([]byte(name + ": " + st + "\n"))
+		for svc, st := range process.List() {
+			conn.Write([]byte(svc + ": " + st + "\n"))
 		}
 	case "status":
-		name := ""
-		if len(fields) > 1 {
-			name = fields[1]
-		}
 		if name == "" {
-			// default to first
-			for n := range process.List() {
-				name = n
+			for svc := range process.List() {
+				name = svc
 				break
 			}
 		}
 		conn.Write([]byte(name + ": " + process.Status(name) + "\n"))
 	case "stop":
-		if len(fields) > 1 {
-			conn.Write([]byte(process.Stop(fields[1]).Error() + "\n"))
+		if name != "" {
+			if err := process.Stop(name); err != nil {
+				conn.Write([]byte("error: " + err.Error() + "\n"))
+			} else {
+				conn.Write([]byte("stopped: " + name + "\n"))
+			}
+		} else {
+			conn.Write([]byte("error: no service name\n"))
 		}
+	default:
+		conn.Write([]byte("error: unknown command\n"))
 	}
 }
 
@@ -65,14 +73,11 @@ func main() {
 	}
 	defer logFile.Close()
 
-	// load config
 	port := strconv.Itoa(utils.CONFIG.App.Port)
 
-	// start demo
 	policy := process.RestartPolicy{MaxRetries: -1, Delay: 5 * time.Second}
 	process.Manage("sleep", []string{"60"}, policy)
 
-	// socket
 	sock := "/var/run/super.sock"
 	os.Remove(sock)
 	ln, _ := net.Listen("unix", sock)
@@ -83,9 +88,9 @@ func main() {
 		}
 	}()
 
-	// http
 	hlog.Infof("HTTP on %s", port)
-	handler := http.DefaultServeMux
 	router.RegisterRoutes()
-	http.ListenAndServe(":"+port, handler)
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
+		hlog.Error(err.Error())
+	}
 }
