@@ -108,17 +108,17 @@ WantedBy=multi-user.target
 
 2. 重新加载 systemd 并启用、启动服务：
 
-   ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl enable superd
-   sudo systemctl start superd
-   ```
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable superd
+sudo systemctl start superd
+```
 
 3. 查看 `superd` 运行状态：
 
-   ```bash
-   systemctl status superd
-   ```
+```bash
+systemctl status superd
+```
 
 ---
 
