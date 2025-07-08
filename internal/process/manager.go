@@ -33,7 +33,7 @@ func SetWorkingDir(name, dir string) {
 }
 
 // Manage starts and monitors a named process with policy.
-func Manage(name string, args []string, policy RestartPolicy) {
+func Manage(name string, args []string, WorkingDirectory string, policy RestartPolicy) {
 	go func() {
 		retries := 0
 		for {
@@ -54,9 +54,8 @@ func Manage(name string, args []string, policy RestartPolicy) {
 			hlog.Infof("Starting %s %v", name, args)
 			cmd := exec.Command(program, cmdArgs...)
 
-			// —— 新增：若事先调用过 SetWorkingDir，则切换到指定目录 ——
-			if wd, ok := workingDirs[name]; ok && wd != "" {
-				cmd.Dir = wd
+			if WorkingDirectory != "" {
+				cmd.Dir = WorkingDirectory
 			}
 
 			cmd.Stdout = stdoutW

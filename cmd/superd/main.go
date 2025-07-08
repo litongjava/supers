@@ -52,9 +52,7 @@ func loadAndManageAll() error {
 	// 启动新增的
 	for name, cfg := range newConfigs {
 		if _, ok := serviceConfigs[name]; !ok {
-			// —— 先设置工作目录 ——
-			process.SetWorkingDir(name, cfg.WorkingDirectory)
-			process.Manage(name, cfg.Args, cfg.RestartPolicy)
+			process.Manage(name, cfg.Args, cfg.WorkingDirectory, cfg.RestartPolicy)
 		}
 	}
 
@@ -64,7 +62,12 @@ func loadAndManageAll() error {
 
 // handleConn 增加 reload 和 start 命令
 func handleConn(conn net.Conn) {
-	defer conn.Close()
+	defer func(conn net.Conn) {
+		err := conn.Close()
+		if err != nil {
+			hlog.Error(err)
+		}
+	}(conn)
 	buf := make([]byte, 512)
 	n, _ := conn.Read(buf)
 	fields := strings.Fields(string(buf[:n]))
@@ -80,7 +83,10 @@ func handleConn(conn net.Conn) {
 	switch cmd {
 	case "list":
 		for svc, st := range process.List() {
-			conn.Write([]byte(svc + ": " + st + "\n"))
+			_, err := conn.Write([]byte(svc + ": " + st + "\n"))
+			if err != nil {
+				hlog.Error(err)
+			}
 		}
 	case "status":
 		if name == "" {
@@ -116,14 +122,13 @@ func handleConn(conn net.Conn) {
 			configMutex.Lock()
 			serviceConfigs[name] = cfg
 			configMutex.Unlock()
-			process.Manage(name, cfg.Args, cfg.RestartPolicy)
+			process.Manage(name, cfg.Args, cfg.WorkingDirectory, cfg.RestartPolicy)
 			conn.Write([]byte("started: " + name + "\n"))
 			return
 		}
 		// 已有的直接启动
 		cfg := serviceConfigs[name]
-		process.SetWorkingDir(name, cfg.WorkingDirectory)
-		process.Manage(name, cfg.Args, cfg.RestartPolicy)
+		process.Manage(name, cfg.Args, cfg.WorkingDirectory, cfg.RestartPolicy)
 		conn.Write([]byte("started: " + name + "\n"))
 	case "reload":
 		if err := loadAndManageAll(); err != nil {

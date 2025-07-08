@@ -2,12 +2,12 @@ package services
 
 import (
 	"fmt"
-	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/litongjava/supers/internal/process"
 )
 
@@ -19,7 +19,7 @@ type ServiceConfig struct {
 	WorkingDirectory string
 }
 
-// LoadConfigs 读取 dir 下所有 *.service，解析 ExecStart、Restart、RestartSec
+// LoadConfigs 读取 dir 下所有 *.service，解析 ExecStart、WorkingDirectory、Restart、RestartSec
 func LoadConfigs(dir string) (map[string]ServiceConfig, error) {
 	pattern := filepath.Join(dir, "*.service")
 	files, err := filepath.Glob(pattern)
@@ -38,21 +38,18 @@ func LoadConfigs(dir string) (map[string]ServiceConfig, error) {
 		}
 		lines := strings.Split(string(b), "\n")
 
-		var execStart string
-		// 默认重启延迟 5s
+		var execStart, workDir string
 		restartDelay := 5 * time.Second
 
 		for _, l := range lines {
 			l = strings.TrimSpace(l)
-			if strings.HasPrefix(l, "=") {
+			switch {
+			case strings.HasPrefix(l, "ExecStart="):
 				execStart = strings.TrimPrefix(l, "ExecStart=")
-			} else if strings.HasPrefix(l, "Restart=") {
-				if strings.Contains(l, "on-failure") {
-
-				}
-			} else if strings.HasPrefix(l, "RestartSec=") {
-				val := strings.TrimPrefix(l, "RestartSec=")
-				if d, err := time.ParseDuration(val); err == nil {
+			case strings.HasPrefix(l, "WorkingDirectory="):
+				workDir = strings.TrimPrefix(l, "WorkingDirectory=")
+			case strings.HasPrefix(l, "RestartSec="):
+				if d, err := time.ParseDuration(strings.TrimPrefix(l, "RestartSec=")); err == nil {
 					restartDelay = d
 				}
 			}
@@ -71,9 +68,10 @@ func LoadConfigs(dir string) (map[string]ServiceConfig, error) {
 		}
 
 		services[name] = ServiceConfig{
-			Name:          name,
-			Args:          parts[1:], // parts[0] 是可执行程序名
-			RestartPolicy: policy,
+			Name:             name,
+			Args:             parts,
+			RestartPolicy:    policy,
+			WorkingDirectory: workDir,
 		}
 	}
 
@@ -89,17 +87,18 @@ func LoadConfigFile(dir, name string) (ServiceConfig, error) {
 	}
 	lines := strings.Split(string(data), "\n")
 
-	var execStart string
+	var execStart, workDir string
 	restartDelay := 5 * time.Second
 
 	for _, l := range lines {
 		l = strings.TrimSpace(l)
-		if strings.HasPrefix(l, "ExecStart=") {
+		switch {
+		case strings.HasPrefix(l, "ExecStart="):
 			execStart = strings.TrimPrefix(l, "ExecStart=")
-		} else if strings.HasPrefix(l, "Restart=") {
-		} else if strings.HasPrefix(l, "RestartSec=") {
-			val := strings.TrimPrefix(l, "RestartSec=")
-			if d, err := time.ParseDuration(val); err == nil {
+		case strings.HasPrefix(l, "WorkingDirectory="):
+			workDir = strings.TrimPrefix(l, "WorkingDirectory=")
+		case strings.HasPrefix(l, "RestartSec="):
+			if d, err := time.ParseDuration(strings.TrimPrefix(l, "RestartSec=")); err == nil {
 				restartDelay = d
 			}
 		}
@@ -115,11 +114,12 @@ func LoadConfigFile(dir, name string) (ServiceConfig, error) {
 		Delay:         restartDelay,
 		RestartOnZero: false,
 	}
-	hlog.Info(name, " ", parts)
 
+	hlog.Infof("Loaded service %s: args=%v, workDir=%s", name, parts, workDir)
 	return ServiceConfig{
-		Name:          name,
-		Args:          parts,
-		RestartPolicy: policy,
+		Name:             name,
+		Args:             parts,
+		RestartPolicy:    policy,
+		WorkingDirectory: workDir,
 	}, nil
 }
