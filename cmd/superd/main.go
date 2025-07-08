@@ -42,16 +42,18 @@ func loadAndManageAll() error {
 	configMutex.Lock()
 	defer configMutex.Unlock()
 
-	// 停止已删除的服务
+	// 停止已删除的
 	for name := range serviceConfigs {
 		if _, ok := newConfigs[name]; !ok {
 			process.Stop(name)
 		}
 	}
 
-	// 启动新增的服务
+	// 启动新增的
 	for name, cfg := range newConfigs {
 		if _, ok := serviceConfigs[name]; !ok {
+			// —— 先设置工作目录 ——
+			process.SetWorkingDir(name, cfg.WorkingDirectory)
 			process.Manage(name, cfg.Args, cfg.RestartPolicy)
 		}
 	}
@@ -120,6 +122,7 @@ func handleConn(conn net.Conn) {
 		}
 		// 已有的直接启动
 		cfg := serviceConfigs[name]
+		process.SetWorkingDir(name, cfg.WorkingDirectory)
 		process.Manage(name, cfg.Args, cfg.RestartPolicy)
 		conn.Write([]byte("started: " + name + "\n"))
 	case "reload":

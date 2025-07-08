@@ -12,9 +12,10 @@ import (
 
 // ServiceConfig holds one .service 文件解析后的信息
 type ServiceConfig struct {
-	Name          string
-	Args          []string
-	RestartPolicy process.RestartPolicy
+	Name             string
+	Args             []string
+	RestartPolicy    process.RestartPolicy
+	WorkingDirectory string
 }
 
 // LoadConfigs 读取 dir 下所有 *.service，解析 ExecStart、Restart、RestartSec

@@ -2,13 +2,13 @@ package process
 
 import (
 	"fmt"
-	"github.com/litongjava/supers/internal/events"
-	"github.com/litongjava/supers/internal/logger"
 	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/common/hlog"
+	"github.com/litongjava/supers/internal/events"
+	"github.com/litongjava/supers/internal/logger"
 )
 
 // RestartPolicy defines restart behavior for a process.
@@ -21,41 +21,61 @@ type RestartPolicy struct {
 var (
 	// procs holds active commands by name
 	procs = make(map[string]*exec.Cmd)
+	// manualStop 标记手动停止过的服务
+	manualStop = make(map[string]bool)
+	// workingDirs 保存每个服务的工作目录
+	workingDirs = make(map[string]string)
 )
-var manualStop = make(map[string]bool)
+
+// SetWorkingDir 为某个服务设置启动时的工作目录
+func SetWorkingDir(name, dir string) {
+	workingDirs[name] = dir
+}
 
 // Manage starts and monitors a named process with policy.
 func Manage(name string, args []string, policy RestartPolicy) {
 	go func() {
 		retries := 0
 		for {
-			// prepare logs directory
-			// assume logger.SetupLog creates dirs and returns writers
+			// 日志准备
 			stdoutW, stderrW, err := logger.SetupLog(name)
 			if err != nil {
 				hlog.Errorf("logger setup failed for %s: %v", name, err)
 			}
 
-			// start
+			// —— 新增：从 args[0] 自动识别可执行程序 ——
+			program := name
+			cmdArgs := args
+			if len(args) > 0 && (strings.HasPrefix(args[0], "/") || strings.Contains(args[0], "/")) {
+				program = args[0]
+				cmdArgs = args[1:]
+			}
+
 			hlog.Infof("Starting %s %v", name, args)
-			cmd := exec.Command(name, args...)
+			cmd := exec.Command(program, cmdArgs...)
+
+			// —— 新增：若事先调用过 SetWorkingDir，则切换到指定目录 ——
+			if wd, ok := workingDirs[name]; ok && wd != "" {
+				cmd.Dir = wd
+			}
+
 			cmd.Stdout = stdoutW
 			cmd.Stderr = stderrW
 			if err := cmd.Start(); err != nil {
 				hlog.Errorf("start %s failed: %v", name, err)
 				return
 			}
-			// register
-			procs[name] = cmd
-			pid := cmd.Process.Pid
-			hlog.Infof("%s PID=%d", name, pid)
 
+			// 注册并记录 PID
+			procs[name] = cmd
+			hlog.Infof("%s PID=%d", name, cmd.Process.Pid)
+
+			// 等待退出
 			err = cmd.Wait()
 			exitCode := cmd.ProcessState.ExitCode()
-			e := events.Event{Name: name, ExitCode: exitCode, Type: events.EventProcessExited}
-			events.Emit(e)
+			events.Emit(events.Event{Name: name, ExitCode: exitCode, Type: events.EventProcessExited})
 
-			msg := strings.Join([]string{name, "exited", "code", string(exitCode)}, " ")
+			msg := fmt.Sprintf("%s exited code %d", name, exitCode)
 			if err != nil {
 				hlog.Errorf(msg)
 			} else {
@@ -67,15 +87,14 @@ func Manage(name string, args []string, policy RestartPolicy) {
 				return
 			}
 
+			// 重启与退出逻辑保持不变……
 			if shouldRestart(exitCode, retries, policy) {
-				re := events.Event{Name: name, ExitCode: exitCode, Type: events.EventProcessRestarted}
-				events.Emit(re)
+				events.Emit(events.Event{Name: name, ExitCode: exitCode, Type: events.EventProcessRestarted})
 				retries++
 				time.Sleep(policy.Delay)
 				continue
 			}
 
-			// decide restart
 			if exitCode == 0 && !policy.RestartOnZero {
 				return
 			}
