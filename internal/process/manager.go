@@ -32,11 +32,6 @@ var (
 	commands = make(map[string]string)
 )
 
-// SetWorkingDir 为某个服务设置启动时的工作目录
-func SetWorkingDir(name, dir string) {
-	workingDirs[name] = dir
-}
-
 // Manage starts and monitors a named process with policy.
 func Manage(name string, cmd []string, WorkingDirectory string, policy RestartPolicy) {
 	go func() {
@@ -68,7 +63,9 @@ func Manage(name string, cmd []string, WorkingDirectory string, policy RestartPo
 			cmd := exec.Command(program, cmdArgs...)
 			if WorkingDirectory != "" {
 				cmd.Dir = WorkingDirectory
+				workingDirs[name] = WorkingDirectory
 			}
+
 			cmd.Stdout = stdoutW
 			cmd.Stderr = stderrW
 			if err := cmd.Start(); err != nil {

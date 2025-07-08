@@ -80,7 +80,6 @@ func handleConn(conn net.Conn) {
 	if len(fields) > 1 {
 		name = fields[1]
 	}
-
 	switch cmd {
 	case "list":
 		for svc := range process.List() {
@@ -105,7 +104,6 @@ func handleConn(conn net.Conn) {
 		hlog.Infof("%s %s %s %s %s\n", name, status, uptime, workingDirSummary, cmdSummary)
 		line := fmt.Sprintf("%s %s %s %s %s\n", name, status, uptime, workingDirSummary, cmdSummary)
 		conn.Write([]byte(line))
-
 	case "stop":
 		if name == "" {
 			conn.Write([]byte("error: no service name\n"))
