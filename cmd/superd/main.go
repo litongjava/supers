@@ -102,6 +102,7 @@ func handleConn(conn net.Conn) {
 		uptime := process.Uptime(name)
 		cmdSummary := process.Command(name)
 		workingDirSummary := process.WorkingDir(name)
+		hlog.Infof("%s %s %s %s %s\n", name, status, uptime, workingDirSummary, cmdSummary)
 		line := fmt.Sprintf("%s %s %s %s %s\n", name, status, uptime, workingDirSummary, cmdSummary)
 		conn.Write([]byte(line))
 
