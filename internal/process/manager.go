@@ -62,16 +62,17 @@ func Manage(name string, args []string, policy RestartPolicy) {
 				hlog.Infof(msg)
 			}
 
+			if manualStop[name] {
+				hlog.Infof("Process %s was manually stopped; skipping restart", name)
+				return
+			}
+
 			if shouldRestart(exitCode, retries, policy) {
 				re := events.Event{Name: name, ExitCode: exitCode, Type: events.EventProcessRestarted}
 				events.Emit(re)
 				retries++
 				time.Sleep(policy.Delay)
 				continue
-			}
-			if manualStop[name] {
-				hlog.Infof("Process %s was manually stopped; skipping restart", name)
-				return
 			}
 
 			// decide restart

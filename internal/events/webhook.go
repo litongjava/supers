@@ -3,6 +3,7 @@ package events
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"net/http"
 
 	"github.com/litongjava/supers/utils"
@@ -25,6 +26,9 @@ func NewWebhookHandler() *WebhookHandler {
 func (w *WebhookHandler) Handle(e Event) {
 	payload, _ := json.Marshal(e)
 	for _, url := range w.URLs {
-		http.Post(url, "application/json", bytes.NewBuffer(payload))
+		_, err := http.Post(url, "application/json", bytes.NewBuffer(payload))
+		if err != nil {
+			hlog.Error(err)
+		}
 	}
 }
