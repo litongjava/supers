@@ -28,5 +28,7 @@ func SetupLog(name string) (stdout io.Writer, stderr io.Writer, err error) {
 		MaxAge:     7,
 		Compress:   true,
 	}
-	return io.MultiWriter(os.Stdout, out), io.MultiWriter(os.Stderr, errOut), nil
+
+	// 仅写文件，不输出到控制台
+	return out, io.MultiWriter(os.Stderr, errOut), nil
 }

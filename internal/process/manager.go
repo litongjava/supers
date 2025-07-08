@@ -50,7 +50,6 @@ func Manage(name string, args []string, WorkingDirectory string, policy RestartP
 				program = args[0]
 				cmdArgs = args[1:]
 			}
-
 			hlog.Infof("Starting %s %v", name, args)
 			cmd := exec.Command(program, cmdArgs...)
 
