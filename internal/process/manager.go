@@ -25,6 +25,11 @@ var (
 	manualStop = make(map[string]bool)
 	// workingDirs 保存每个服务的工作目录
 	workingDirs = make(map[string]string)
+
+	// startTimes 记录每个服务的最近一次启动时间
+	startTimes = make(map[string]time.Time)
+	// commands 记录每个服务的完整命令行，用于摘要展示
+	commands = make(map[string]string)
 )
 
 // SetWorkingDir 为某个服务设置启动时的工作目录
@@ -43,20 +48,27 @@ func Manage(name string, args []string, WorkingDirectory string, policy RestartP
 				hlog.Errorf("logger setup failed for %s: %v", name, err)
 			}
 
-			// —— 新增：从 args[0] 自动识别可执行程序 ——
+			// —— 自动识别可执行程序 ——
 			program := name
 			cmdArgs := args
 			if len(args) > 0 && (strings.HasPrefix(args[0], "/") || strings.Contains(args[0], "/")) {
 				program = args[0]
 				cmdArgs = args[1:]
 			}
+
+			// 记录启动时间和命令行
+			startTimes[name] = time.Now()
+			fullCmd := program
+			if len(cmdArgs) > 0 {
+				fullCmd += " " + strings.Join(cmdArgs, " ")
+			}
+			commands[name] = fullCmd
+
 			hlog.Infof("Starting %s %v", name, args)
 			cmd := exec.Command(program, cmdArgs...)
-
 			if WorkingDirectory != "" {
 				cmd.Dir = WorkingDirectory
 			}
-
 			cmd.Stdout = stdoutW
 			cmd.Stderr = stderrW
 			if err := cmd.Start(); err != nil {
@@ -72,7 +84,6 @@ func Manage(name string, args []string, WorkingDirectory string, policy RestartP
 			err = cmd.Wait()
 			exitCode := cmd.ProcessState.ExitCode()
 			events.Emit(events.Event{Name: name, ExitCode: exitCode, Type: events.EventProcessExited})
-
 			msg := fmt.Sprintf("%s exited code %d", name, exitCode)
 			if err != nil {
 				hlog.Errorf(msg)
@@ -85,14 +96,13 @@ func Manage(name string, args []string, WorkingDirectory string, policy RestartP
 				return
 			}
 
-			// 重启与退出逻辑保持不变……
+			// 重启逻辑
 			if shouldRestart(exitCode, retries, policy) {
 				events.Emit(events.Event{Name: name, ExitCode: exitCode, Type: events.EventProcessRestarted})
 				retries++
 				time.Sleep(policy.Delay)
 				continue
 			}
-
 			if exitCode == 0 && !policy.RestartOnZero {
 				return
 			}
@@ -115,12 +125,11 @@ func Stop(name string) error {
 	if err := cmd.Process.Kill(); err != nil {
 		return err
 	}
-	// 标记一下，下次 Status 就能识别
 	manualStop[name] = true
 	return nil
 }
 
-// Status returns "running" or "exited" or "not found".
+// Status returns "running", "exited", "stopped" or "not found".
 func Status(name string) string {
 	if manualStop[name] {
 		return "stopped"
@@ -142,6 +151,34 @@ func List() map[string]string {
 		statuses[name] = Status(name)
 	}
 	return statuses
+}
+
+// Uptime returns a formatted uptime like "Up 9 hours".
+func Uptime(name string) string {
+	start, ok := startTimes[name]
+	if !ok {
+		return ""
+	}
+	d := time.Since(start)
+	h := int(d.Hours())
+	if h > 0 {
+		return fmt.Sprintf("Up %d hours", h)
+	}
+	m := int(d.Minutes())
+	return fmt.Sprintf("Up %d minutes", m)
+}
+
+// Command returns a truncated command summary, e.g. "java -jar target/ai…"
+func Command(name string) string {
+	cmd, ok := commands[name]
+	if !ok {
+		return ""
+	}
+	const maxLen = 20
+	if len(cmd) <= maxLen {
+		return cmd
+	}
+	return cmd[:maxLen] + "…"
 }
 
 func shouldRestart(exitCode, retries int, policy RestartPolicy) bool {

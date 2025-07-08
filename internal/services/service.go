@@ -14,7 +14,7 @@ import (
 // ServiceConfig holds one .service 文件解析后的信息
 type ServiceConfig struct {
 	Name             string
-	Args             []string
+	Cmd              []string
 	RestartPolicy    process.RestartPolicy
 	WorkingDirectory string
 }
@@ -69,7 +69,7 @@ func LoadConfigs(dir string) (map[string]ServiceConfig, error) {
 
 		services[name] = ServiceConfig{
 			Name:             name,
-			Args:             parts,
+			Cmd:              parts,
 			RestartPolicy:    policy,
 			WorkingDirectory: workDir,
 		}
@@ -118,7 +118,7 @@ func LoadConfigFile(dir, name string) (ServiceConfig, error) {
 	hlog.Infof("Loaded service %s: args=%v, workDir=%s", name, parts, workDir)
 	return ServiceConfig{
 		Name:             name,
-		Args:             parts,
+		Cmd:              parts,
 		RestartPolicy:    policy,
 		WorkingDirectory: workDir,
 	}, nil

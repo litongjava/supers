@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/litongjava/supers/internal/process"
 	"github.com/litongjava/supers/internal/services"
@@ -52,7 +53,7 @@ func loadAndManageAll() error {
 	// 启动新增的
 	for name, cfg := range newConfigs {
 		if _, ok := serviceConfigs[name]; !ok {
-			process.Manage(name, cfg.Args, cfg.WorkingDirectory, cfg.RestartPolicy)
+			process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy)
 		}
 	}
 
@@ -82,11 +83,12 @@ func handleConn(conn net.Conn) {
 
 	switch cmd {
 	case "list":
-		for svc, st := range process.List() {
-			_, err := conn.Write([]byte(svc + ": " + st + "\n"))
-			if err != nil {
-				hlog.Error(err)
-			}
+		for svc := range process.List() {
+			status := process.Status(svc)
+			uptime := process.Uptime(svc)
+			cmdSummary := process.Command(svc)
+			line := fmt.Sprintf("%s %s %s %s\n", svc, status, uptime, cmdSummary)
+			conn.Write([]byte(line))
 		}
 	case "status":
 		if name == "" {
@@ -95,7 +97,12 @@ func handleConn(conn net.Conn) {
 				break
 			}
 		}
-		conn.Write([]byte(name + ": " + process.Status(name) + "\n"))
+		status := process.Status(name)
+		uptime := process.Uptime(name)
+		cmdSummary := process.Command(name)
+		line := fmt.Sprintf("%s %s %s %s\n", name, status, uptime, cmdSummary)
+		conn.Write([]byte(line))
+
 	case "stop":
 		if name == "" {
 			conn.Write([]byte("error: no service name\n"))
@@ -122,13 +129,13 @@ func handleConn(conn net.Conn) {
 			configMutex.Lock()
 			serviceConfigs[name] = cfg
 			configMutex.Unlock()
-			process.Manage(name, cfg.Args, cfg.WorkingDirectory, cfg.RestartPolicy)
+			process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy)
 			conn.Write([]byte("started: " + name + "\n"))
 			return
 		}
 		// 已有的直接启动
 		cfg := serviceConfigs[name]
-		process.Manage(name, cfg.Args, cfg.WorkingDirectory, cfg.RestartPolicy)
+		process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy)
 		conn.Write([]byte("started: " + name + "\n"))
 	case "reload":
 		if err := loadAndManageAll(); err != nil {
