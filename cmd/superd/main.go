@@ -1,18 +1,23 @@
 package main
 
 import (
+	"github.com/cloudwego/hertz/pkg/common/hlog"
+	"github.com/litongjava/supers/internal/process"
+	"github.com/litongjava/supers/internal/services"
+	"github.com/litongjava/supers/router"
+	"github.com/litongjava/supers/utils"
 	"io"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
-	"time"
+	"sync"
+)
 
-	"github.com/cloudwego/hertz/pkg/common/hlog"
-	"github.com/litongjava/supers/internal/process"
-	"github.com/litongjava/supers/router"
-	"github.com/litongjava/supers/utils"
+var (
+	serviceConfigs = make(map[string]services.ServiceConfig)
+	configMutex    sync.Mutex
 )
 
 func InitLog() (*os.File, error) {
@@ -25,6 +30,37 @@ func InitLog() (*os.File, error) {
 	return f, nil
 }
 
+// loadAndManageAll 从 /etc/super/*.service 重新加载所有配置，
+// 对比差异：新增 -> 启动；删除 -> 停止
+func loadAndManageAll() error {
+	const dir = "/etc/super"
+	newConfigs, err := services.LoadConfigs(dir)
+	if err != nil {
+		return err
+	}
+
+	configMutex.Lock()
+	defer configMutex.Unlock()
+
+	// 停止已删除的服务
+	for name := range serviceConfigs {
+		if _, ok := newConfigs[name]; !ok {
+			process.Stop(name)
+		}
+	}
+
+	// 启动新增的服务
+	for name, cfg := range newConfigs {
+		if _, ok := serviceConfigs[name]; !ok {
+			process.Manage(name, cfg.Args, cfg.RestartPolicy)
+		}
+	}
+
+	serviceConfigs = newConfigs
+	return nil
+}
+
+// handleConn 增加 reload 和 start 命令
 func handleConn(conn net.Conn) {
 	defer conn.Close()
 	buf := make([]byte, 512)
@@ -38,6 +74,7 @@ func handleConn(conn net.Conn) {
 	if len(fields) > 1 {
 		name = fields[1]
 	}
+
 	switch cmd {
 	case "list":
 		for svc, st := range process.List() {
@@ -52,14 +89,44 @@ func handleConn(conn net.Conn) {
 		}
 		conn.Write([]byte(name + ": " + process.Status(name) + "\n"))
 	case "stop":
-		if name != "" {
-			if err := process.Stop(name); err != nil {
-				conn.Write([]byte("error: " + err.Error() + "\n"))
-			} else {
-				conn.Write([]byte("stopped: " + name + "\n"))
-			}
-		} else {
+		if name == "" {
 			conn.Write([]byte("error: no service name\n"))
+		} else if err := process.Stop(name); err != nil {
+			conn.Write([]byte("error: " + err.Error() + "\n"))
+		} else {
+			conn.Write([]byte("stopped: " + name + "\n"))
+		}
+	case "start":
+		if name == "" {
+			conn.Write([]byte("error: no service name\n"))
+			return
+		}
+		configMutex.Lock()
+		_, exists := serviceConfigs[name]
+		configMutex.Unlock()
+		// on-demand 加载新配置
+		if !exists {
+			cfg, err := services.LoadConfigFile("/etc/super", name)
+			if err != nil {
+				conn.Write([]byte("error: load config failed: " + err.Error() + "\n"))
+				return
+			}
+			configMutex.Lock()
+			serviceConfigs[name] = cfg
+			configMutex.Unlock()
+			process.Manage(name, cfg.Args, cfg.RestartPolicy)
+			conn.Write([]byte("started: " + name + "\n"))
+			return
+		}
+		// 已有的直接启动
+		cfg := serviceConfigs[name]
+		process.Manage(name, cfg.Args, cfg.RestartPolicy)
+		conn.Write([]byte("started: " + name + "\n"))
+	case "reload":
+		if err := loadAndManageAll(); err != nil {
+			conn.Write([]byte("error: reload failed: " + err.Error() + "\n"))
+		} else {
+			conn.Write([]byte("reloaded\n"))
 		}
 	default:
 		conn.Write([]byte("error: unknown command\n"))
@@ -73,11 +140,12 @@ func main() {
 	}
 	defer logFile.Close()
 
-	port := strconv.Itoa(utils.CONFIG.App.Port)
+	// 初始加载
+	if err := loadAndManageAll(); err != nil {
+		hlog.Errorf("initial load failed: %v", err)
+	}
 
-	policy := process.RestartPolicy{MaxRetries: -1, Delay: 5 * time.Second}
-	process.Manage("sleep", []string{"60"}, policy)
-
+	// unix sock 服务
 	sock := "/var/run/super.sock"
 	os.Remove(sock)
 	ln, _ := net.Listen("unix", sock)
@@ -88,6 +156,8 @@ func main() {
 		}
 	}()
 
+	// HTTP 控制接口
+	port := strconv.Itoa(utils.CONFIG.App.Port)
 	hlog.Infof("HTTP on %s", port)
 	router.RegisterRoutes()
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
