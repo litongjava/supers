@@ -47,7 +47,7 @@ func LoadConfigs(dir string) (map[string]ServiceConfig, error) {
 				execStart = strings.TrimPrefix(l, "ExecStart=")
 			} else if strings.HasPrefix(l, "Restart=") {
 				if strings.Contains(l, "on-failure") {
-					_ = true
+
 				}
 			} else if strings.HasPrefix(l, "RestartSec=") {
 				val := strings.TrimPrefix(l, "RestartSec=")
@@ -117,7 +117,7 @@ func LoadConfigFile(dir, name string) (ServiceConfig, error) {
 
 	return ServiceConfig{
 		Name:          name,
-		Args:          parts[1:],
+		Args:          parts,
 		RestartPolicy: policy,
 	}, nil
 }
