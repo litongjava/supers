@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -19,9 +20,24 @@ func InitLog() (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	fileWriter := io.MultiWriter(f, os.Stdout)
-	hlog.SetOutput(fileWriter)
+	hlog.SetOutput(io.MultiWriter(f, os.Stdout))
 	return f, nil
+}
+
+func handleConn(conn net.Conn) {
+	defer conn.Close()
+	buf := make([]byte, 256)
+	n, _ := conn.Read(buf)
+	req := string(buf[:n])
+	switch req {
+	case "list":
+		for name, st := range process.List() {
+			conn.Write([]byte(name + ": " + st + "\n"))
+		}
+	case "status":
+		conn.Write([]byte(process.Status("sleep") + "\n"))
+		// add parse for start/stop etc...
+	}
 }
 
 func main() {
@@ -31,26 +47,26 @@ func main() {
 	}
 	defer logFile.Close()
 
-	// Load configuration
+	// load config
 	port := strconv.Itoa(utils.CONFIG.App.Port)
 
-	// Start and monitor demo process with restart policy
-	policy := process.RestartPolicy{
-		MaxRetries:    -1,
-		Delay:         5 * time.Second,
-		RestartOnZero: false,
-	}
+	// manage demo process
+	policy := process.RestartPolicy{MaxRetries: -1, Delay: 5 * time.Second}
 	process.Manage("sleep", []string{"60"}, policy)
 
-	// Start HTTP server
-	for i := 1; i < len(os.Args); i += 2 {
-		if os.Args[i] == "--port" {
-			port = os.Args[i+1]
+	// unix sock listener
+	sock := "/var/run/super.sock"
+	os.Remove(sock)
+	ln, _ := net.Listen("unix", sock)
+	go func() {
+		for {
+			conn, _ := ln.Accept()
+			go handleConn(conn)
 		}
-	}
-	hlog.Infof("start listen on: %s", port)
+	}()
+
+	// http API
+	hlog.Infof("start http on %s", port)
 	router.RegisterRoutes()
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		hlog.Error(err.Error())
-	}
+	http.ListenAndServe(":"+port, nil)
 }
