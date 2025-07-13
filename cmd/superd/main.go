@@ -105,39 +105,13 @@ func handleConn(conn net.Conn) {
 		line := fmt.Sprintf("%s %s %s %s %s\n", name, status, uptime, workingDirSummary, cmdSummary)
 		conn.Write([]byte(line))
 	case "stop":
-		if name == "" {
-			conn.Write([]byte("error: no service name\n"))
-		} else if err := process.Stop(name); err != nil {
-			conn.Write([]byte("error: " + err.Error() + "\n"))
-		} else {
-			conn.Write([]byte("stopped: " + name + "\n"))
-		}
+		stop(conn, name)
 	case "start":
-		if name == "" {
-			conn.Write([]byte("error: no service name\n"))
-			return
-		}
-		configMutex.Lock()
-		_, exists := serviceConfigs[name]
-		configMutex.Unlock()
-		// on-demand 加载新配置
-		if !exists {
-			cfg, err := services.LoadConfigFile("/etc/super", name)
-			if err != nil {
-				conn.Write([]byte("error: load config failed: " + err.Error() + "\n"))
-				return
-			}
-			configMutex.Lock()
-			serviceConfigs[name] = cfg
-			configMutex.Unlock()
-			process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy)
-			conn.Write([]byte("started: " + name + "\n"))
-			return
-		}
-		// 已有的直接启动
-		cfg := serviceConfigs[name]
-		process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy)
-		conn.Write([]byte("started: " + name + "\n"))
+		start(conn, name)
+
+	case "restart":
+		stop(conn, name)
+		start(conn, name)
 	case "reload":
 		if err := loadAndManageAll(); err != nil {
 			conn.Write([]byte("error: reload failed: " + err.Error() + "\n"))
@@ -146,6 +120,46 @@ func handleConn(conn net.Conn) {
 		}
 	default:
 		conn.Write([]byte("error: unknown command\n"))
+	}
+}
+
+func start(conn net.Conn, name string) {
+	if name == "" {
+		conn.Write([]byte("error: no service name\n"))
+		return
+	}
+	configMutex.Lock()
+	_, exists := serviceConfigs[name]
+	configMutex.Unlock()
+	// on-demand 加载新配置
+	if !exists {
+		cfg, err := services.LoadConfigFile("/etc/super", name)
+		if err != nil {
+			conn.Write([]byte("error: load config failed: " + err.Error() + "\n"))
+			return
+		}
+		configMutex.Lock()
+		serviceConfigs[name] = cfg
+		configMutex.Unlock()
+		process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy)
+		conn.Write([]byte("started: " + name + "\n"))
+		return
+	}
+
+	// 已有的直接启动
+	cfg := serviceConfigs[name]
+	process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy)
+	conn.Write([]byte("started: " + name + "\n"))
+	return
+}
+
+func stop(conn net.Conn, name string) {
+	if name == "" {
+		conn.Write([]byte("error: no service name\n"))
+	} else if err := process.Stop(name); err != nil {
+		conn.Write([]byte("error: " + err.Error() + "\n"))
+	} else {
+		conn.Write([]byte("stopped: " + name + "\n"))
 	}
 }
 

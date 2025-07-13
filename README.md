@@ -121,7 +121,20 @@ systemctl status superd
 ```
 
 ---
+## MacOS
+```shell
+# 以 root 模式（启动为系统服务）
+sudo brew services start /usr/local/bin/superd
 
+# 或者以当前用户模式（启动为用户级 LaunchAgent）
+brew services start /usr/local/bin/superd
+
+# 查看运行状态
+brew services list
+
+# 停止
+brew services stop /usr/local/bin/superd
+```
 ## 使用 supers 客户端
 
 在系统上安装并启动 `superd` 后，你可以使用 `supers` 命令通过 Unix Socket 管理子进程：
