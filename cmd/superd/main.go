@@ -82,14 +82,16 @@ func handleConn(conn net.Conn) {
 	}
 	switch cmd {
 	case "list":
-		for svc := range process.List() {
+		for svc := range serviceConfigs {
 			status := process.Status(svc)
 			uptime := process.Uptime(svc)
 			cmdSummary := process.Command(svc)
-			workingDirSummary := process.WorkingDir(svc)
-			line := fmt.Sprintf("%s %s %s %s %s\n", svc, status, uptime, workingDirSummary, cmdSummary)
+			workDir := process.WorkingDir(svc)
+			line := fmt.Sprintf("%s %s %s %s %s\n",
+				svc, status, uptime, workDir, cmdSummary)
 			conn.Write([]byte(line))
 		}
+
 	case "status":
 		if name == "" {
 			for svc := range process.List() {
