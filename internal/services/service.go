@@ -1,9 +1,11 @@
+// services/config.go
 package services
 
 import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -17,9 +19,13 @@ type ServiceConfig struct {
 	Cmd              []string
 	RestartPolicy    process.RestartPolicy
 	WorkingDirectory string
+	Env              []string
 }
 
-// LoadConfigs 读取 dir 下所有 *.service，解析 ExecStart、WorkingDirectory、Restart、RestartSec
+// 解析一行 Environment="FOO=bar" VAR2=baz
+var envLineRe = regexp.MustCompile(`"([^"]+)"|(\S+)`)
+
+// LoadConfigs 读取 dir 下所有 *.service
 func LoadConfigs(dir string) (map[string]ServiceConfig, error) {
 	pattern := filepath.Join(dir, "*.service")
 	files, err := filepath.Glob(pattern)
@@ -29,9 +35,7 @@ func LoadConfigs(dir string) (map[string]ServiceConfig, error) {
 
 	services := make(map[string]ServiceConfig)
 	for _, file := range files {
-		name := filepath.Base(file)
-		name = strings.TrimSuffix(name, ".service")
-
+		name := strings.TrimSuffix(filepath.Base(file), ".service")
 		b, err := ioutil.ReadFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", file, err)
@@ -39,6 +43,7 @@ func LoadConfigs(dir string) (map[string]ServiceConfig, error) {
 		lines := strings.Split(string(b), "\n")
 
 		var execStart, workDir string
+		var envs []string
 		restartDelay := 5 * time.Second
 
 		for _, l := range lines {
@@ -52,19 +57,27 @@ func LoadConfigs(dir string) (map[string]ServiceConfig, error) {
 				if d, err := time.ParseDuration(strings.TrimPrefix(l, "RestartSec=")); err == nil {
 					restartDelay = d
 				}
+			case strings.HasPrefix(l, "Environment="):
+				raw := strings.TrimPrefix(l, "Environment=")
+				for _, m := range envLineRe.FindAllStringSubmatch(raw, -1) {
+					kv := m[1]
+					if kv == "" {
+						kv = m[2]
+					}
+					envs = append(envs, kv)
+				}
 			}
 		}
 
 		if execStart == "" {
-			// 跳过没有 ExecStart 的文件
 			continue
 		}
 
 		parts := strings.Fields(execStart)
 		policy := process.RestartPolicy{
-			MaxRetries:    -1,           // 无限重试
-			Delay:         restartDelay, // 重启延迟
-			RestartOnZero: false,        // 退出码 0 不重启
+			MaxRetries:    -1,
+			Delay:         restartDelay,
+			RestartOnZero: false,
 		}
 
 		services[name] = ServiceConfig{
@@ -72,13 +85,13 @@ func LoadConfigs(dir string) (map[string]ServiceConfig, error) {
 			Cmd:              parts,
 			RestartPolicy:    policy,
 			WorkingDirectory: workDir,
+			Env:              envs,
 		}
 	}
 
 	return services, nil
 }
 
-// LoadConfigFile 仅加载单个 /etc/super/<name>.service，用于 on-demand start
 func LoadConfigFile(dir, name string) (ServiceConfig, error) {
 	path := filepath.Join(dir, name+".service")
 	data, err := ioutil.ReadFile(path)
@@ -88,6 +101,7 @@ func LoadConfigFile(dir, name string) (ServiceConfig, error) {
 	lines := strings.Split(string(data), "\n")
 
 	var execStart, workDir string
+	var envs []string
 	restartDelay := 5 * time.Second
 
 	for _, l := range lines {
@@ -101,25 +115,30 @@ func LoadConfigFile(dir, name string) (ServiceConfig, error) {
 			if d, err := time.ParseDuration(strings.TrimPrefix(l, "RestartSec=")); err == nil {
 				restartDelay = d
 			}
+		case strings.HasPrefix(l, "Environment="):
+			raw := strings.TrimPrefix(l, "Environment=")
+			for _, m := range envLineRe.FindAllStringSubmatch(raw, -1) {
+				kv := m[1]
+				if kv == "" {
+					kv = m[2]
+				}
+				envs = append(envs, kv)
+			}
 		}
 	}
 
 	if execStart == "" {
 		return ServiceConfig{}, fmt.Errorf("no ExecStart in %s", path)
 	}
-
 	parts := strings.Fields(execStart)
-	policy := process.RestartPolicy{
-		MaxRetries:    -1,
-		Delay:         restartDelay,
-		RestartOnZero: false,
-	}
+	policy := process.RestartPolicy{-1, restartDelay, false}
 
-	hlog.Infof("Loaded service %s: args=%v, workDir=%s", name, parts, workDir)
+	hlog.Infof("Loaded service %s: args=%v, workDir=%s, env=%v", name, parts, workDir, envs)
 	return ServiceConfig{
 		Name:             name,
 		Cmd:              parts,
 		RestartPolicy:    policy,
 		WorkingDirectory: workDir,
+		Env:              envs,
 	}, nil
 }

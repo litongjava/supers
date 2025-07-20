@@ -2,6 +2,7 @@ package process
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -33,7 +34,7 @@ var (
 )
 
 // Manage starts and monitors a named process with policy.
-func Manage(name string, cmd []string, WorkingDirectory string, policy RestartPolicy) {
+func Manage(name string, cmd []string, WorkingDirectory string, policy RestartPolicy, env []string) {
 	go func() {
 		retries := 0
 		for {
@@ -61,6 +62,9 @@ func Manage(name string, cmd []string, WorkingDirectory string, policy RestartPo
 
 			hlog.Infof("Starting %s %v", name, cmd)
 			cmd := exec.Command(program, cmdArgs...)
+			if len(env) > 0 {
+				cmd.Env = append(os.Environ(), env...)
+			}
 			if WorkingDirectory != "" {
 				cmd.Dir = WorkingDirectory
 				workingDirs[name] = WorkingDirectory
