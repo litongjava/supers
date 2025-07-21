@@ -14,21 +14,18 @@ func SetupLog(name string) (stdout io.Writer, stderr io.Writer, err error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, nil, err
 	}
-	out := &lumberjack.Logger{
-		Filename:   filepath.Join(dir, "stdout.log"),
+	// 用一个 lumberjack.Logger 既写 stdout 又写 stderr
+	combined := &lumberjack.Logger{
+		Filename:   filepath.Join(dir, "combined.log"),
 		MaxSize:    10, // megabytes
 		MaxBackups: 5,
 		MaxAge:     7, // days
 		Compress:   true,
 	}
-	errOut := &lumberjack.Logger{
-		Filename:   filepath.Join(dir, "stderr.log"),
-		MaxSize:    10,
-		MaxBackups: 5,
-		MaxAge:     7,
-		Compress:   true,
-	}
-
-	// 仅写文件，不输出到控制台
-	return out, io.MultiWriter(os.Stderr, errOut), nil
+	// 如果还想同时在控制台看到 stderr，可以这样：
+	// stderr = io.MultiWriter(os.Stderr, combined)
+	// stdout = combined
+	stdout = combined
+	stderr = combined
+	return
 }
