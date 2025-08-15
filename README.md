@@ -15,7 +15,89 @@
 ---
 
 ## 快速开始
+### 安装
+```shell
+mkdir /opt/package/supers -p
+wget https://github.com/litongjava/supers/releases/download/v1.0.4/supers-1.0.4-linux-amd64.tar.gz
+tar -xf supers-1.0.4-linux-amd64.tar.gz -C /data/apps/
+cd /data/apps/
+mv supers-1.0.4-linux-amd64/ supers
+cd supers
 
+sudo mv superd /usr/local/bin/
+sudo mv supers /usr/local/bin/
+sudo chmod +x /usr/local/bin/superd /usr/local/bin/supers
+```
+
+### 测试启动
+```shell
+superd
+```
+
+### 使用 systemd 管理 superd
+1./data/apps/supers/config/config.yml
+```
+app:
+  port: 10405
+  filePath: /data/upload
+  password: 123456
+```
+将以下内容保存为 /etc/systemd/system/superd.service：
+```service
+[Unit]
+Description=SuperD Process Management Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/data/apps/supers
+ExecStart=/usr/local/bin/superd
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+```
+重新加载 systemd 并启用、启动服务：
+```shell
+sudo systemctl daemon-reload
+sudo systemctl enable superd
+sudo systemctl start superd
+```
+
+查看 superd 运行状态：
+```shell
+systemctl status superd
+```
+
+### 管理服务
+创建服务描述目录：
+```shell
+sudo mkdir -p /etc/super
+```
+
+在 /etc/super 下添加你的 .service 文件。例如：
+# /etc/super/docker-io-proxy.service
+```service
+[Unit]
+Description=docker-io-proxy Java Web Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/data/apps/docker-io-proxy
+ExecStart=/usr/java/jdk1.8.0_411/bin/java -jar target/docker-io-proxy-1.0.0.jar --server.port=8004
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target
+```
+（可选）修改 config/config.yml 以调整 HTTP 端口、Webhook URL 等。
+
+## 编译构建
 ### 环境依赖
 
 - Go 1.20+  
@@ -43,82 +125,6 @@ sudo chmod +x /usr/local/bin/superd /usr/local/bin/supers
 ```
 
 ---
-
-## 配置
-
-1. 创建服务描述目录：
-
-   ```bash
-   sudo mkdir -p /etc/super
-   ```
-
-2. 在 `/etc/super` 下添加你的 `.service` 文件。例如：
-
-   ```ini
-   # /etc/super/docker-io-proxy.service
-   [Unit]
-   Description=docker-io-proxy Java Web Service
-   After=network.target
-
-   [Service]
-   Type=simple
-   User=root
-   WorkingDirectory=/data/apps/docker-io-proxy
-   ExecStart=/usr/java/jdk1.8.0_211/bin/java -jar target/docker-io-proxy-1.0.0.jar --server.port=8004
-   Restart=on-failure
-   RestartSec=5s
-
-   [Install]
-   WantedBy=default.target
-   ```
-
-3. （可选）修改 `config/config.yml` 以调整 HTTP 端口、Webhook URL 等。
-
----
-
-## 使用 systemd 管理 `superd`
-
-1./data/apps/supers/config/config.yml
-```yaml
-app:
-  port: 10405
-  filePath: /data/upload
-  password: 123456
-```
-
-
-2. 将以下内容保存为 `/etc/systemd/system/superd.service`：
-
-```ini
-[Unit]
-Description=SuperD Process Management Daemon
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/data/apps/supers
-ExecStart=/usr/local/bin/superd
-Restart=on-failure
-RestartSec=5s
-
-[Install]
-WantedBy=multi-user.target
-```
-
-2. 重新加载 systemd 并启用、启动服务：
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable superd
-sudo systemctl start superd
-```
-
-3. 查看 `superd` 运行状态：
-
-```bash
-systemctl status superd
-```
 
 ---
 ## MacOS
