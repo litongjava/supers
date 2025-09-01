@@ -148,9 +148,9 @@ func Manage(conn net.Conn, name string, cmd []string, WorkingDirectory string, p
       c.Stdout = stdoutW
       c.Stderr = stderrW
       if err := c.Start(); err != nil {
+        errMsg := "failed: " + name + " err=" + err.Error()
+        hlog.Error(errMsg)
         if conn != nil {
-          errMsg := "failed: " + name + " err=" + err.Error()
-          hlog.Error(errMsg)
           _, _ = conn.Write([]byte(errMsg + "\n"))
         }
         return
