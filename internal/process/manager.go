@@ -6,6 +6,7 @@ import (
   "os"
   "os/exec"
   "strings"
+  "sync"
   "time"
 
   "github.com/cloudwego/hertz/pkg/common/hlog"
@@ -13,39 +14,112 @@ import (
   "github.com/litongjava/supers/internal/logger"
 )
 
-// RestartPolicy defines restart behavior for a process.
 type RestartPolicy struct {
-  MaxRetries    int           // -1 for unlimited
-  Delay         time.Duration // delay before restart
-  RestartOnZero bool          // restart on exit code 0
+  MaxRetries    int
+  Delay         time.Duration
+  RestartOnZero bool
 }
 
-var (
-  // procs holds active commands by name
-  procs = make(map[string]*exec.Cmd)
-  // manualStop 标记手动停止过的服务
-  manualStop = make(map[string]bool)
-  // workingDirs 保存每个服务的工作目录
-  workingDirs = make(map[string]string)
+// ---- concurrency-safe registry ----
 
-  // startTimes 记录每个服务的最近一次启动时间
-  startTimes = make(map[string]time.Time)
-  // commands 记录每个服务的完整命令行，用于摘要展示
-  commands = make(map[string]string)
-)
+type registry struct {
+  mu          sync.RWMutex
+  procs       map[string]*exec.Cmd
+  manualStop  map[string]bool
+  workingDirs map[string]string
+  startTimes  map[string]time.Time
+  commands    map[string]string
+}
 
-// Manage starts and monitors a named process with policy.
+func newRegistry() *registry {
+  return &registry{
+    procs:       make(map[string]*exec.Cmd),
+    manualStop:  make(map[string]bool),
+    workingDirs: make(map[string]string),
+    startTimes:  make(map[string]time.Time),
+    commands:    make(map[string]string),
+  }
+}
+
+var reg = newRegistry()
+
+// helpers
+func (r *registry) setProc(name string, cmd *exec.Cmd) {
+  r.mu.Lock()
+  r.procs[name] = cmd
+  r.mu.Unlock()
+}
+func (r *registry) getProc(name string) (*exec.Cmd, bool) {
+  r.mu.RLock()
+  cmd, ok := r.procs[name]
+  r.mu.RUnlock()
+  return cmd, ok
+}
+func (r *registry) setManualStop(name string, v bool) {
+  r.mu.Lock()
+  r.manualStop[name] = v
+  r.mu.Unlock()
+}
+func (r *registry) isManualStop(name string) bool {
+  r.mu.RLock()
+  v := r.manualStop[name]
+  r.mu.RUnlock()
+  return v
+}
+func (r *registry) setWorkingDir(name, dir string) {
+  r.mu.Lock()
+  r.workingDirs[name] = dir
+  r.mu.Unlock()
+}
+func (r *registry) getWorkingDir(name string) (string, bool) {
+  r.mu.RLock()
+  d, ok := r.workingDirs[name]
+  r.mu.RUnlock()
+  return d, ok
+}
+func (r *registry) setStartTime(name string, t time.Time) {
+  r.mu.Lock()
+  r.startTimes[name] = t
+  r.mu.Unlock()
+}
+func (r *registry) getStartTime(name string) (time.Time, bool) {
+  r.mu.RLock()
+  t, ok := r.startTimes[name]
+  r.mu.RUnlock()
+  return t, ok
+}
+func (r *registry) setCommand(name, cmd string) {
+  r.mu.Lock()
+  r.commands[name] = cmd
+  r.mu.Unlock()
+}
+func (r *registry) getCommand(name string) (string, bool) {
+  r.mu.RLock()
+  c, ok := r.commands[name]
+  r.mu.RUnlock()
+  return c, ok
+}
+func (r *registry) snapshotProcNames() []string {
+  r.mu.RLock()
+  names := make([]string, 0, len(r.procs))
+  for n := range r.procs {
+    names = append(names, n)
+  }
+  r.mu.RUnlock()
+  return names
+}
+
+// ---- process manager ----
+
 func Manage(conn net.Conn, name string, cmd []string, WorkingDirectory string, policy RestartPolicy, env []string) {
   go func() {
     retries := 0
     for {
-      // 日志准备
       stdoutW, stderrW, err := logger.SetupLog(name)
       if err != nil {
         hlog.Errorf("logger setup failed for %s: %v", name, err)
       }
 
-      // —— 自动识别可执行程序 ——
       program := name
       cmdArgs := cmd
       if len(cmd) > 0 && (strings.HasPrefix(cmd[0], "/") || strings.Contains(cmd[0], "/")) {
@@ -53,47 +127,44 @@ func Manage(conn net.Conn, name string, cmd []string, WorkingDirectory string, p
         cmdArgs = cmd[1:]
       }
 
-      // 记录启动时间和命令行
-      startTimes[name] = time.Now()
+      // record metadata (locked)
+      reg.setStartTime(name, time.Now())
       fullCmd := program
       if len(cmdArgs) > 0 {
         fullCmd += " " + strings.Join(cmdArgs, " ")
       }
-      commands[name] = fullCmd
+      reg.setCommand(name, fullCmd)
 
       hlog.Infof("Starting %s %v", name, cmd)
-      cmd := exec.Command(program, cmdArgs...)
+      c := exec.Command(program, cmdArgs...)
       if len(env) > 0 {
-        cmd.Env = append(os.Environ(), env...)
+        c.Env = append(os.Environ(), env...)
       }
       if WorkingDirectory != "" {
-        cmd.Dir = WorkingDirectory
-        workingDirs[name] = WorkingDirectory
+        c.Dir = WorkingDirectory
+        reg.setWorkingDir(name, WorkingDirectory)
       }
 
-      cmd.Stdout = stdoutW
-      cmd.Stderr = stderrW
-      if err := cmd.Start(); err != nil {
+      c.Stdout = stdoutW
+      c.Stderr = stderrW
+      if err := c.Start(); err != nil {
         if conn != nil {
           errMsg := "failed: " + name + " err=" + err.Error()
           hlog.Error(errMsg)
-          conn.Write([]byte(errMsg + "\n"))
+          _, _ = conn.Write([]byte(errMsg + "\n"))
         }
-
         return
       }
 
       if conn != nil {
-        conn.Write([]byte("started: " + name + "\n"))
+        _, _ = conn.Write([]byte("started: " + name + "\n"))
       }
 
-      // 注册并记录 PID
-      procs[name] = cmd
-      hlog.Infof("%s PID=%d", name, cmd.Process.Pid)
+      reg.setProc(name, c)
+      hlog.Infof("%s PID=%d", name, c.Process.Pid)
 
-      // 等待退出
-      err = cmd.Wait()
-      exitCode := cmd.ProcessState.ExitCode()
+      err = c.Wait()
+      exitCode := c.ProcessState.ExitCode()
       events.Emit(events.Event{Name: name, ExitCode: exitCode, Type: events.EventProcessExited})
       msg := fmt.Sprintf("%s exited code %d", name, exitCode)
       if err != nil {
@@ -102,12 +173,11 @@ func Manage(conn net.Conn, name string, cmd []string, WorkingDirectory string, p
         hlog.Infof(msg)
       }
 
-      if manualStop[name] {
+      if reg.isManualStop(name) {
         hlog.Infof("Process %s was manually stopped; skipping restart", name)
         return
       }
 
-      // 重启逻辑
       if shouldRestart(exitCode, retries, policy) {
         events.Emit(events.Event{Name: name, ExitCode: exitCode, Type: events.EventProcessRestarted})
         retries++
@@ -120,6 +190,7 @@ func Manage(conn net.Conn, name string, cmd []string, WorkingDirectory string, p
       if policy.MaxRetries >= 0 && retries >= policy.MaxRetries {
         return
       }
+
       retries++
       hlog.Infof("restart %s in %s (retry %d)", name, policy.Delay, retries)
       time.Sleep(policy.Delay)
@@ -127,25 +198,23 @@ func Manage(conn net.Conn, name string, cmd []string, WorkingDirectory string, p
   }()
 }
 
-// Stop kills the named process.
 func Stop(name string) error {
-  cmd, ok := procs[name]
+  cmd, ok := reg.getProc(name)
   if !ok || cmd.Process == nil {
     return fmt.Errorf("no process: %s", name)
   }
   if err := cmd.Process.Kill(); err != nil {
     return err
   }
-  manualStop[name] = true
+  reg.setManualStop(name, true)
   return nil
 }
 
-// Status returns "running", "exited", "stopped" or "not found".
 func Status(name string) string {
-  if manualStop[name] {
+  if reg.isManualStop(name) {
     return "stopped"
   }
-  cmd, ok := procs[name]
+  cmd, ok := reg.getProc(name)
   if !ok {
     return "not found"
   }
@@ -155,18 +224,16 @@ func Status(name string) string {
   return "running"
 }
 
-// List returns map of names to statuses.
 func List() map[string]string {
   statuses := make(map[string]string)
-  for name := range procs {
-    statuses[name] = Status(name)
+  for _, name := range reg.snapshotProcNames() {
+    statuses[name] = Status(name) // Status has its own locks
   }
   return statuses
 }
 
-// Uptime returns a formatted uptime like "Up 9 hours".
 func Uptime(name string) string {
-  start, ok := startTimes[name]
+  start, ok := reg.getStartTime(name)
   if !ok {
     return ""
   }
@@ -179,9 +246,8 @@ func Uptime(name string) string {
   return fmt.Sprintf("Up %d minutes", m)
 }
 
-// Command returns a truncated command summary, e.g. "java -jar target/ai…"
 func Command(name string) string {
-  cmd, ok := commands[name]
+  cmd, ok := reg.getCommand(name)
   if !ok {
     return ""
   }
@@ -192,17 +258,16 @@ func Command(name string) string {
   return cmd[:maxLen] + "…"
 }
 
-// Command returns a truncated workingDir summary
 func WorkingDir(name string) string {
-  cmd, ok := workingDirs[name]
+  d, ok := reg.getWorkingDir(name)
   if !ok {
     return ""
   }
   const maxLen = 20
-  if len(cmd) <= maxLen {
-    return cmd
+  if len(d) <= maxLen {
+    return d
   }
-  return cmd[:maxLen] + "…"
+  return d[:maxLen] + "…"
 }
 
 func shouldRestart(exitCode, retries int, policy RestartPolicy) bool {
