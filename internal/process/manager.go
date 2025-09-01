@@ -2,7 +2,6 @@ package process
 
 import (
   "fmt"
-  "net"
   "os"
   "os/exec"
   "strings"
@@ -111,11 +110,7 @@ func (r *registry) snapshotProcNames() []string {
 
 // ---- process manager ----
 
-func Manage(conn net.Conn, name string, cmd []string, WorkingDirectory string, policy RestartPolicy, env []string) {
-  if conn != nil {
-    var errMsg = "starting +" + name + ",cmd" + strings.Join(cmd, " ")
-    _, _ = conn.Write([]byte(errMsg + "\n"))
-  }
+func Manage(name string, cmd []string, WorkingDirectory string, policy RestartPolicy, env []string) {
 
   go func() {
     retries := 0
@@ -155,24 +150,26 @@ func Manage(conn net.Conn, name string, cmd []string, WorkingDirectory string, p
       if err := c.Start(); err != nil {
         errMsg := "failed: " + name + " err=" + err.Error()
         hlog.Error(errMsg)
-        if conn != nil {
-          _, _ = conn.Write([]byte(errMsg + "\n"))
-        } else {
-          hlog.Infof("conn is nil")
-        }
+        events.Emit(events.Event{
+          Name:  name,
+          Type:  events.EventProcessStartFailed,
+          Error: err.Error(),
+        })
         return
       }
 
-      if conn != nil {
-        _, _ = conn.Write([]byte("started: " + name + "\n"))
-      }
-
+      events.Emit(events.Event{
+        Name: name,
+        Type: events.EventProcessStarted,
+        PID:  c.Process.Pid,
+      })
       reg.setProc(name, c)
       hlog.Infof("%s PID=%d", name, c.Process.Pid)
 
       err = c.Wait()
       exitCode := c.ProcessState.ExitCode()
       events.Emit(events.Event{Name: name, ExitCode: exitCode, Type: events.EventProcessExited})
+
       msg := fmt.Sprintf("%s exited code %d", name, exitCode)
       if err != nil {
         hlog.Errorf(msg)

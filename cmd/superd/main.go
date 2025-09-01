@@ -3,6 +3,7 @@ package main
 import (
   "fmt"
   "github.com/cloudwego/hertz/pkg/common/hlog"
+  "github.com/litongjava/supers/internal/events"
   "github.com/litongjava/supers/internal/process"
   "github.com/litongjava/supers/internal/services"
   "github.com/litongjava/supers/router"
@@ -14,6 +15,7 @@ import (
   "strconv"
   "strings"
   "sync"
+  "time"
 )
 
 var (
@@ -53,7 +55,7 @@ func loadAndManageAll() error {
   // 启动新增的
   for name, cfg := range newConfigs {
     if _, ok := serviceConfigs[name]; !ok {
-      process.Manage(nil, name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
+      process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
     }
   }
 
@@ -130,6 +132,7 @@ func start(conn net.Conn, name string) {
     conn.Write([]byte("error: no service name\n"))
     return
   }
+
   configMutex.Lock()
   _, exists := serviceConfigs[name]
   configMutex.Unlock()
@@ -143,14 +146,27 @@ func start(conn net.Conn, name string) {
     configMutex.Lock()
     serviceConfigs[name] = cfg
     configMutex.Unlock()
-    process.Manage(conn, name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
+    // 1) 订阅一次性“已启动”事件
+    startedCh := events.SubscribeOnce(name, events.EventProcessStarted)
+    failedCh := events.SubscribeOnce(name, events.EventProcessStartFailed)
 
+    process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
+    select {
+    case ev := <-startedCh:
+      fmt.Fprintf(conn, "started: %s PID=%d\n", ev.Name, ev.PID)
+
+    case ev := <-failedCh:
+      fmt.Fprintf(conn, "failed: %s error=%s\n", ev.Name, ev.Error)
+
+    case <-time.After(5 * time.Second):
+      fmt.Fprintf(conn, "start pending: %s\n", name)
+    }
     return
   }
 
   // 已有的直接启动
   cfg := serviceConfigs[name]
-  process.Manage(conn, name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
+  process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
   return
 }
 
