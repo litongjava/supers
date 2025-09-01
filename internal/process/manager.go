@@ -152,6 +152,8 @@ func Manage(conn net.Conn, name string, cmd []string, WorkingDirectory string, p
         hlog.Error(errMsg)
         if conn != nil {
           _, _ = conn.Write([]byte(errMsg + "\n"))
+        } else {
+          hlog.Infof("conn is nil")
         }
         return
       }

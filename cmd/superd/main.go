@@ -151,7 +151,6 @@ func start(conn net.Conn, name string) {
   // 已有的直接启动
   cfg := serviceConfigs[name]
   process.Manage(conn, name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
-  conn.Write([]byte("started: " + name + "\n"))
   return
 }
 
