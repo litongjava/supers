@@ -112,6 +112,11 @@ func (r *registry) snapshotProcNames() []string {
 // ---- process manager ----
 
 func Manage(conn net.Conn, name string, cmd []string, WorkingDirectory string, policy RestartPolicy, env []string) {
+  if conn != nil {
+    var errMsg = "starting +" + name + ",cmd" + strings.Join(cmd, " ")
+    _, _ = conn.Write([]byte(errMsg + "\n"))
+  }
+
   go func() {
     retries := 0
     for {
