@@ -2,6 +2,7 @@ package process
 
 import (
   "fmt"
+  "net"
   "os"
   "os/exec"
   "strings"
@@ -34,8 +35,7 @@ var (
 )
 
 // Manage starts and monitors a named process with policy.
-func Manage(name string, cmd []string, WorkingDirectory string, policy RestartPolicy, env []string) <-chan error {
-  result := make(chan error, 1)
+func Manage(conn net.Conn, name string, cmd []string, WorkingDirectory string, policy RestartPolicy, env []string) {
   go func() {
     retries := 0
     for {
@@ -74,13 +74,18 @@ func Manage(name string, cmd []string, WorkingDirectory string, policy RestartPo
       cmd.Stdout = stdoutW
       cmd.Stderr = stderrW
       if err := cmd.Start(); err != nil {
-        result <- err
-        close(result)
+        if conn != nil {
+          errMsg := "failed: " + name + " err=" + err.Error()
+          hlog.Error(errMsg)
+          conn.Write([]byte(errMsg + "\n"))
+        }
+
         return
       }
 
-      result <- nil
-      close(result)
+      if conn != nil {
+        conn.Write([]byte("started: " + name + "\n"))
+      }
 
       // 注册并记录 PID
       procs[name] = cmd
@@ -120,7 +125,6 @@ func Manage(name string, cmd []string, WorkingDirectory string, policy RestartPo
       time.Sleep(policy.Delay)
     }
   }()
-  return result
 }
 
 // Stop kills the named process.

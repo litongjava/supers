@@ -53,7 +53,7 @@ func loadAndManageAll() error {
   // 启动新增的
   for name, cfg := range newConfigs {
     if _, ok := serviceConfigs[name]; !ok {
-      process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
+      process.Manage(nil, name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
     }
   }
 
@@ -143,19 +143,14 @@ func start(conn net.Conn, name string) {
     configMutex.Lock()
     serviceConfigs[name] = cfg
     configMutex.Unlock()
-    res := process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
-    if err := <-res; err != nil {
-      conn.Write([]byte("failed: " + name + " err=" + err.Error() + "\n"))
-    } else {
-      conn.Write([]byte("started: " + name + "\n"))
-    }
+    process.Manage(conn, name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
 
     return
   }
 
   // 已有的直接启动
   cfg := serviceConfigs[name]
-  process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
+  process.Manage(conn, name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
   conn.Write([]byte("started: " + name + "\n"))
   return
 }
