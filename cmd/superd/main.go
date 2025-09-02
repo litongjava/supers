@@ -129,47 +129,46 @@ func handleConn(conn net.Conn) {
 
 func start(conn net.Conn, name string) {
   if name == "" {
-    conn.Write([]byte("error: no service name\n"))
+    fmt.Fprintln(conn, "error: no service name")
     return
   }
 
+  // 加载/确认 cfg
   configMutex.Lock()
-  _, exists := serviceConfigs[name]
+  cfg, exists := serviceConfigs[name]
   configMutex.Unlock()
-  // on-demand 加载新配置
+
   if !exists {
-    cfg, err := services.LoadConfigFile("/etc/super", name)
+    c, err := services.LoadConfigFile("/etc/super", name)
     if err != nil {
-      conn.Write([]byte("error: load config failed: " + err.Error() + "\n"))
+      fmt.Fprintf(conn, "error: load config failed: %v\n", err)
       return
     }
     configMutex.Lock()
-    serviceConfigs[name] = cfg
+    serviceConfigs[name] = c
     configMutex.Unlock()
-
-    startedCh := events.SubscribeOnce(name, events.EventProcessStarted)
-    failedCh := events.SubscribeOnce(name, events.EventProcessStartFailed)
-
-    process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
-    select {
-    case ev := <-startedCh:
-      hlog.Infof("started: %s PID=%d\n", ev.Name, ev.PID)
-      fmt.Fprintf(conn, "started: %s PID=%d\n", ev.Name, ev.PID)
-    case ev := <-failedCh:
-      hlog.Errorf("started: %s PID=%d\n", ev.Name, ev.PID)
-      fmt.Fprintf(conn, "failed: %s error=%s\n", ev.Name, ev.Error)
-
-    case <-time.After(5 * time.Second):
-      hlog.Infof("start pending: %s\n", name)
-      fmt.Fprintf(conn, "start pending: %s\n", name)
-    }
-    return
+    cfg = c
   }
 
-  // 已有的直接启动
-  cfg := serviceConfigs[name]
+  // 订阅一次性事件（本次调用专属）
+  startedCh := events.SubscribeOnce(name, events.EventProcessStarted)
+  failedCh := events.SubscribeOnce(name, events.EventProcessStartFailed)
+
+  // 触发启动
   process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
-  return
+
+  // 等待结果/超时
+  select {
+  case ev := <-startedCh:
+    hlog.Infof("started: %s PID=%d", ev.Name, ev.PID)
+    fmt.Fprintf(conn, "started: %s PID=%d\n", ev.Name, ev.PID)
+  case ev := <-failedCh:
+    hlog.Errorf("failed: %s error=%s", ev.Name, ev.Error)
+    fmt.Fprintf(conn, "failed: %s error=%s\n", ev.Name, ev.Error)
+  case <-time.After(5 * time.Second):
+    hlog.Infof("start pending: %s", name)
+    fmt.Fprintf(conn, "start pending: %s\n", name)
+  }
 }
 
 func stop(conn net.Conn, name string) {
