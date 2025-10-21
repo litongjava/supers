@@ -166,6 +166,7 @@ func handleConn(conn net.Conn) {
     } else {
       fmt.Fprintf(conn, "restarted: %s PID=%d\n", name, pid)
     }
+    conn.Write([]byte("finish: " + name + "\n"))
 
   case "reload":
     if err := loadAndManageAll(); err != nil {
