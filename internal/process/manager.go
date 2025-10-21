@@ -138,7 +138,17 @@ func Manage(name string, cmd []string, WorkingDirectory string, policy RestartPo
       hlog.Infof("Starting %s %v", name, cmd)
       c := exec.Command(program, cmdArgs...)
       if len(env) > 0 {
-        c.Env = append(os.Environ(), env...)
+        expandedEnv := make([]string, 0, len(env))
+        systemEnv := os.Environ()
+
+        for _, e := range env {
+          // 展开 $VAR 和 ${VAR}
+          expanded := os.ExpandEnv(e)
+          expandedEnv = append(expandedEnv, expanded)
+        }
+        c.Env = append(systemEnv, expandedEnv...)
+      } else {
+        c.Env = os.Environ()
       }
       if WorkingDirectory != "" {
         c.Dir = WorkingDirectory
