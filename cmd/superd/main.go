@@ -166,7 +166,10 @@ func handleConn(conn net.Conn) {
     } else {
       fmt.Fprintf(conn, "restarted: %s PID=%d\n", name, pid)
     }
-    conn.Write([]byte("finished: " + name + "\n"))
+    _, err = conn.Write([]byte("finished: " + name + "\n"))
+    if err != nil {
+      hlog.Errorf("Failed to write 'finished' to client: %v", err)
+    }
 
   case "reload":
     if err := loadAndManageAll(); err != nil {
