@@ -207,13 +207,27 @@ func Stop(name string) error {
   if !ok || cmd.Process == nil {
     return fmt.Errorf("no process: %s", name)
   }
+
+  // 订阅退出事件
+  exitedCh := events.SubscribeOnce(name, events.EventProcessExited)
+
+  // 设置手动停止标志
+  reg.setManualStop(name, true)
+
+  // 发送 SIGKILL
   if err := cmd.Process.Kill(); err != nil {
     return err
   }
-  reg.setManualStop(name, true)
-  return nil
-}
 
+  // 等待退出事件（最多 5 秒）
+  select {
+  case <-exitedCh:
+    hlog.Infof("Process %s exited", name)
+    return nil
+  case <-time.After(5 * time.Second):
+    return fmt.Errorf("timeout waiting for %s to exit", name)
+  }
+}
 func Status(name string) string {
   if reg.isManualStop(name) {
     return "stopped"

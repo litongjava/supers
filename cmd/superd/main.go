@@ -138,7 +138,19 @@ func handleConn(conn net.Conn) {
     start(conn, name)
 
   case "restart":
-    stop(conn, name)
+    if name == "" {
+      conn.Write([]byte("error: no service name\n"))
+      return
+    }
+
+    // Stop() 会阻塞直到进程真正退出
+    if err := process.Stop(name); err != nil {
+      conn.Write([]byte("error: stop failed: " + err.Error() + "\n"))
+      return
+    }
+    conn.Write([]byte("stopped: " + name + "\n"))
+
+    // 此时可以安全地启动新进程
     start(conn, name)
   case "reload":
     if err := loadAndManageAll(); err != nil {
