@@ -25,6 +25,7 @@ var (
 )
 
 const dir = "/etc/super"
+const sock = "/var/run/super.sock"
 
 func ensureDir(path string, perm os.FileMode) error {
   info, err := os.Stat(path)
@@ -221,7 +222,10 @@ func main() {
   }
 
   // unix sock 服务
-  sock := "/var/run/super.sock"
+  // 2) 确保 socket 的父目录存在（通常 /var/run）
+  if err := ensureParentDir(sock, 0o755); err != nil {
+    hlog.Fatalf("ensure parent dir for socket failed: %v", err)
+  }
   os.Remove(sock)
   ln, _ := net.Listen("unix", sock)
   go func() {
