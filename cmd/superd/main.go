@@ -12,6 +12,7 @@ import (
   "net"
   "net/http"
   "os"
+  "path/filepath"
   "strconv"
   "strings"
   "sync"
@@ -22,6 +23,28 @@ var (
   serviceConfigs = make(map[string]services.ServiceConfig)
   configMutex    sync.Mutex
 )
+
+const dir = "/etc/super"
+
+func ensureDir(path string, perm os.FileMode) error {
+  info, err := os.Stat(path)
+  if err == nil {
+    if !info.IsDir() {
+      return fmt.Errorf("%s exists but is not a directory", path)
+    }
+    return nil
+  }
+  if os.IsNotExist(err) {
+    return os.MkdirAll(path, perm)
+  }
+  return err
+}
+
+func ensureParentDir(filePath string, perm os.FileMode) error {
+  // 确保用于 unix socket 的父目录存在（例如 /var/run）
+  parent := filepath.Dir(filePath)
+  return ensureDir(parent, perm)
+}
 
 func InitLog() (*os.File, error) {
   f, err := os.Create("app.log")
@@ -36,7 +59,7 @@ func InitLog() (*os.File, error) {
 // loadAndManageAll 从 /etc/super/*.service 重新加载所有配置，
 // 对比差异：新增 -> 启动；删除 -> 停止
 func loadAndManageAll() error {
-  const dir = "/etc/super"
+
   newConfigs, err := services.LoadConfigs(dir)
   if err != nil {
     return err
@@ -188,6 +211,10 @@ func main() {
   }
   defer logFile.Close()
 
+  // 1) 确保 /etc/super 目录存在（缺失则创建）
+  if err := ensureDir(dir, 0o755); err != nil {
+    hlog.Fatalf("ensure dir %s failed: %v", dir, err)
+  }
   // 初始加载
   if err := loadAndManageAll(); err != nil {
     hlog.Errorf("initial load failed: %v", err)
