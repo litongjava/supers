@@ -150,16 +150,21 @@ func handleConn(conn net.Conn) {
 
     // 重新加载配置
     configMutex.Lock()
-    cfg := serviceConfigs[name]
+    cfg, exists := serviceConfigs[name]
     configMutex.Unlock()
 
-    // ⭐ 同步启动
+    if !exists {
+      conn.Write([]byte("error: config not found\n"))
+      return
+    }
+
+    // ⭐ 同步启动并返回结果
+    conn.Write([]byte("starting: " + name + "\n"))
     pid, err := process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
     if err != nil {
-      conn.Write([]byte("error: restart failed: " + err.Error() + "\n"))
+      fmt.Fprintf(conn, "error: start failed: %v\n", err)
     } else {
-      line := fmt.Sprintf("restarted: %s PID=%d\n", name, pid)
-      conn.Write([]byte(line))
+      fmt.Fprintf(conn, "restarted: %s PID=%d\n", name, pid)
     }
 
   case "reload":
