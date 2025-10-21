@@ -3,7 +3,6 @@ package main
 import (
   "fmt"
   "github.com/cloudwego/hertz/pkg/common/hlog"
-  "github.com/litongjava/supers/internal/events"
   "github.com/litongjava/supers/internal/process"
   "github.com/litongjava/supers/internal/services"
   "github.com/litongjava/supers/router"
@@ -16,7 +15,6 @@ import (
   "strconv"
   "strings"
   "sync"
-  "time"
 )
 
 var (
@@ -150,8 +148,20 @@ func handleConn(conn net.Conn) {
     }
     conn.Write([]byte("stopped: " + name + "\n"))
 
-    // 此时可以安全地启动新进程
-    start(conn, name)
+    // 重新加载配置
+    configMutex.Lock()
+    cfg := serviceConfigs[name]
+    configMutex.Unlock()
+
+    // ⭐ 同步启动
+    pid, err := process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
+    if err != nil {
+      conn.Write([]byte("error: restart failed: " + err.Error() + "\n"))
+    } else {
+      line := fmt.Sprintf("restarted: %s PID=%d\n", name, pid)
+      conn.Write([]byte(line))
+    }
+
   case "reload":
     if err := loadAndManageAll(); err != nil {
       conn.Write([]byte("error: reload failed: " + err.Error() + "\n"))
@@ -175,7 +185,7 @@ func start(conn net.Conn, name string) {
   configMutex.Unlock()
 
   if !exists {
-    c, err := services.LoadConfigFile("/etc/super", name)
+    c, err := services.LoadConfigFile(dir, name)
     if err != nil {
       fmt.Fprintf(conn, "error: load config failed: %v\n", err)
       return
@@ -186,24 +196,14 @@ func start(conn net.Conn, name string) {
     cfg = c
   }
 
-  // 订阅一次性事件（本次调用专属）
-  startedCh := events.SubscribeOnce(name, events.EventProcessStarted)
-  failedCh := events.SubscribeOnce(name, events.EventProcessStartFailed)
-
-  // 触发启动
-  process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
-
-  // 等待结果/超时
-  select {
-  case ev := <-startedCh:
-    hlog.Infof("started: %s PID=%d", ev.Name, ev.PID)
-    fmt.Fprintf(conn, "started: %s PID=%d\n", ev.Name, ev.PID)
-  case ev := <-failedCh:
-    hlog.Errorf("failed: %s error=%s", ev.Name, ev.Error)
-    fmt.Fprintf(conn, "failed: %s error=%s\n", ev.Name, ev.Error)
-  case <-time.After(5 * time.Second):
-    hlog.Infof("start pending: %s", name)
-    fmt.Fprintf(conn, "start pending: %s\n", name)
+  // ⭐ 同步启动,直接获取结果
+  pid, err := process.Manage(name, cfg.Cmd, cfg.WorkingDirectory, cfg.RestartPolicy, cfg.Env)
+  if err != nil {
+    hlog.Errorf("failed: %s error=%s", name, err.Error())
+    fmt.Fprintf(conn, "failed: %s error=%s\n", name, err.Error())
+  } else {
+    hlog.Infof("started: %s PID=%d", name, pid)
+    fmt.Fprintf(conn, "started: %s PID=%d\n", name, pid)
   }
 }
 
